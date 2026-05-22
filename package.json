@@ -1,0 +1,20 @@
+{
+  "name": "inertia-agent-kit",
+  "version": "0.1.0",
+  "description": "AI-native convention, feedback, audit, and verification kit for Laravel Inertia frontends.",
+  "type": "module",
+  "bin": { "iak": "bin/iak.mjs" },
+  "engines": { "node": ">=18" },
+  "files": ["bin", "src", "docs/inertia-agent-kit"],
+  "keywords": ["inertia", "laravel", "agent", "frontend", "cli"],
+  "scripts": { "test": "node test/smoke.mjs" },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/fbarrento/inertia-agent-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fbarrento/inertia-agent-kit/issues"
+  },
+  "homepage": "https://github.com/fbarrento/inertia-agent-kit#readme",
+  "license": "MIT"
+}
