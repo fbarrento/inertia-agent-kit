@@ -1,0 +1,98 @@
+// {{ generatedMarker }}
+import { edit, show } from '{{ routesImportPath }}'
+import type { {{ listItemType }} } from '{{ localTypesImport }}'
+import { {{ emptyStateComponent }} } from '{{ localEmptyStateImport }}'
+
+type {{ tableComponent }}Props = {
+  error?: string | null
+  isLoading?: boolean
+  items: Partial<{{ listItemType }}>[]
+}
+
+export function {{ tableComponent }}({ error = null, isLoading = false, items }: {{ tableComponent }}Props) {
+  if (error) {
+    return (
+      <section className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md text-ds-default">
+        <p className="text-ds-muted">{error}</p>
+      </section>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <section className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md text-ds-default">
+        <p className="text-ds-muted">Loading {{ resourceName }}</p>
+      </section>
+    )
+  }
+
+  if (items.length === 0) {
+    return <{{ emptyStateComponent }} />
+  }
+
+  return (
+    <section className="overflow-hidden rounded-ds-control border border-ds-border-default bg-ds-surface text-ds-default">
+      <table className="w-full">
+        <thead className="border-b border-ds-border-default">
+          <tr>
+            <th className="p-ds-inset-md text-left text-ds-muted">{{ singularStudly }}</th>
+            <th className="p-ds-inset-md text-left text-ds-muted">Status</th>
+            <th className="p-ds-inset-md text-right text-ds-muted">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr className="border-b border-ds-border-default" key={resourceKey(item, index)}>
+              <td className="p-ds-inset-md">{displayValue(item, ['displayName', 'title', 'name', 'label'], 'Untitled')}</td>
+              <td className="p-ds-inset-md text-ds-muted">{displayValue(item, ['statusLabel', 'status', 'state'], 'Current')}</td>
+              <td className="p-ds-inset-md text-right">
+                <div className="flex justify-end gap-ds-stack-sm">
+                  <a className="text-ds-link" href={hrefFor(show, item)}>View</a>
+                  <a className="text-ds-link" href={hrefFor(edit, item)}>Edit</a>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function displayValue(item: Partial<{{ listItemType }}>, keys: string[], fallback: string): string {
+  const record = item as Record<string, unknown>
+  const value = keys.map((key) => record[key]).find((candidate) => candidate !== undefined && candidate !== null && candidate !== '')
+
+  return value === undefined ? fallback : String(value)
+}
+
+function hrefFor(route: unknown, item: Partial<{{ listItemType }}>): string {
+  const record = item as Record<string, unknown>
+
+  if (typeof record.href === 'string') {
+    return record.href
+  }
+
+  if (typeof route !== 'function') {
+    return '#'
+  }
+
+  const key = record.id ?? record.uuid ?? record.slug
+  const result = (route as (value?: unknown) => unknown)(key)
+
+  if (typeof result === 'string') {
+    return result
+  }
+
+  if (result && typeof result === 'object' && 'url' in result && typeof result.url === 'string') {
+    return result.url
+  }
+
+  return '#'
+}
+
+function resourceKey(item: Partial<{{ listItemType }}>, index: number): string {
+  const record = item as Record<string, unknown>
+
+  return String(record.id ?? record.uuid ?? record.slug ?? index)
+}

@@ -7,27 +7,38 @@ This file gives agent guidance for working on Inertia Agent Kit itself.
 Inertia Agent Kit is an AI-native convention, feedback, audit, and
 verification kit for Laravel Inertia frontends.
 
-The current implementation is a focused Node CLI proof:
+The current product implementation is a Laravel package:
 
-- `bin/iak.mjs` is the executable entrypoint.
-- `src/iak.mjs` contains the CLI implementation.
-- `test/smoke.mjs` builds a throwaway Laravel + Inertia + React fixture and
-  proves the first loop end to end.
+- `composer.json` defines the package `fbarrento/inertia-agent-kit`.
+- `src/InertiaAgentKitServiceProvider.php` registers the package config and
+  Artisan commands.
+- `src/Console/` contains the command entrypoints.
+- `src/Init`, `src/Scaffolding`, `src/Audit`, `src/Feedback`, and command-local
+  verify code contain the first implementation slices.
+- `resources/stubs/react/` contains React scaffold stubs.
+- `resources/boost/` contains Laravel Boost guidance resources.
+- `tests/Feature/` contains Pest/Testbench package coverage.
 - `docs/inertia-agent-kit/` contains the product and architecture specs.
+
+The earlier Node CLI proof remains in `bin/iak.mjs`, `src/iak.mjs`, and
+`test/smoke.mjs` for reference during the port. Do not expand it as the product
+surface.
 
 ## Commands
 
 ```bash
-npm test
-node bin/iak.mjs
-node bin/iak.mjs init --target /path/to/fixture --apply --json
-node bin/iak.mjs new resource vehicles --target /path/to/fixture --apply --json
-node bin/iak.mjs audit --target /path/to/fixture --json
-node bin/iak.mjs verify --target /path/to/fixture --json
+composer test
+php artisan iak:init --json
+php artisan iak:make-resource vehicles --json
+php artisan iak:audit --json
+php artisan iak:feedback list --json
+php artisan iak:feedback show fbk_... --json
+php artisan iak:feedback resolve fbk_... --evidence=.iak/runs/run_.../verify.json --json
+php artisan iak:verify --json
 ```
 
-There is no build step yet. The implementation uses Node built-ins and ESM
-`.mjs` files.
+Package tests use Pest with Orchestra Testbench. If dependencies are missing,
+install Composer dependencies before treating `composer test` as authoritative.
 
 ## Git And PR Conventions
 
@@ -69,18 +80,18 @@ feat: add initial Inertia Agent Kit baseline
 
 ## Current Scope
 
-The first baseline proves:
+The first Laravel package baseline implements:
 
-- `iak init`;
-- `iak new resource vehicles`;
-- `iak audit --json`;
-- `iak feedback create/list/show/resolve --json`;
-- `iak verify --json`;
-- smoke-test verification with screenshot metadata.
+- `iak:init`;
+- `iak:make-resource vehicles`;
+- `iak:audit --json`;
+- `iak:feedback list/show/resolve --json`;
+- `iak:verify --json`;
+- Boost guidance resources;
+- Testbench/Pest coverage for package boot and command slices.
 
 Still pending:
 
-- Laravel package and service provider;
 - real Spatie Data and Wayfinder generation;
 - real Pest Browser and Playwright execution;
 - Storybook addon;

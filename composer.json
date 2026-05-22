@@ -1,0 +1,53 @@
+{
+    "name": "fbarrento/inertia-agent-kit",
+    "description": "AI-native convention, feedback, audit, and verification kit for Laravel Inertia frontends.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "agent",
+        "inertia",
+        "laravel",
+        "testing",
+        "ui"
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/console": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+    },
+    "suggest": {
+        "laravel/boost": "Discovers package-provided Inertia Agent Kit guidelines and skills for Laravel-aware agents."
+    },
+    "autoload": {
+        "psr-4": {
+            "InertiaAgentKit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "InertiaAgentKit\\InertiaAgentKitServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

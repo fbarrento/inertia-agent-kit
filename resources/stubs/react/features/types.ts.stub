@@ -1,0 +1,18 @@
+// {{ generatedMarker }}
+import type { App } from '{{ generatedTypeAlias }}'
+
+export type {{ indexPagePropsType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}IndexPageData
+export type {{ showPagePropsType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}ShowPageData
+export type {{ createPagePropsType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}CreatePageData
+export type {{ editPagePropsType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}EditPageData
+
+export type {{ listItemType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}ListItemData
+export type {{ formValuesType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}FormData
+export type {{ filtersType }} =
+  {{ generatedTypeNamespace }}.{{ singularStudly }}FiltersData

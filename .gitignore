@@ -7,12 +7,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 bun.lockb
+composer.lock
 
 # Build and coverage output
 dist/
 build/
 coverage/
 .nyc_output/
+.phpunit.cache/
 
 # Local environment
 .env

@@ -1,0 +1,32 @@
+// {{ generatedMarker }}
+import type { {{ filtersType }} as {{ filtersType }}Data } from '{{ localTypesImport }}'
+
+type {{ filtersComponent }}Props = {
+  filters?: Partial<{{ filtersType }}Data>
+  onChange?: (filters: Partial<{{ filtersType }}Data>) => void
+}
+
+export function {{ filtersComponent }}({ filters = {}, onChange }: {{ filtersComponent }}Props) {
+  const entries = Object.entries(filters as Record<string, string | number | boolean | null | undefined>)
+
+  return (
+    <section className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md text-ds-default">
+      <div className="flex flex-wrap items-center gap-ds-stack-sm">
+        {entries.length === 0 ? (
+          <span className="text-ds-muted">No active filters</span>
+        ) : (
+          entries.map(([key, value]) => (
+            <button
+              className="rounded-ds-control border border-ds-border-default px-ds-control-x py-ds-control-y text-ds-default"
+              key={key}
+              onClick={() => onChange?.({ ...filters, [key]: undefined })}
+              type="button"
+            >
+              {key}: {String(value ?? 'Any')}
+            </button>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}

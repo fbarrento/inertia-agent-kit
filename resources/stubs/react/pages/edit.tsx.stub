@@ -1,0 +1,30 @@
+// {{ generatedMarker }}
+import type {
+  {{ editPagePropsType }},
+  {{ formValuesType }},
+} from '{{ featureImportBase }}.types'
+import { {{ formComponent }} } from '{{ featureImportBase }}-form'
+
+type Props = {{ editPagePropsType }} & {
+  errors?: Record<string, string>
+  values?: Partial<{{ formValuesType }}>
+}
+
+export default function {{ pageComponent }}(props: Props) {
+  return (
+    <main className="bg-ds-canvas text-ds-default">
+      <section className="flex flex-col gap-ds-stack-md p-ds-inset-lg">
+        <header className="flex flex-col gap-ds-stack-xs">
+          <p className="text-ds-muted">{{ controllerBasename }}@edit</p>
+          <h1 className="text-ds-heading">Edit {{ singularStudly }}</h1>
+        </header>
+
+        <{{ formComponent }}
+          errors={props.errors}
+          mode="edit"
+          values={props.values}
+        />
+      </section>
+    </main>
+  )
+}

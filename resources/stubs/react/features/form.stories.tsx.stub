@@ -1,0 +1,38 @@
+// {{ generatedMarker }}
+import type { Meta, StoryObj } from '@storybook/react'
+import { {{ formComponent }} } from '{{ localFormImport }}'
+import { {{ singularCamel }}FormValues } from '{{ localFixturesImport }}'
+
+const meta = {
+  component: {{ formComponent }},
+  title: 'Resources/{{ pluralStudly }}/{{ formComponent }}',
+} satisfies Meta<typeof {{ formComponent }}>
+
+export default meta
+
+type Story = StoryObj<typeof meta>
+
+export const Default = {
+  args: {
+    mode: 'create',
+    values: {{ singularCamel }}FormValues,
+  },
+} satisfies Story
+
+export const WithValidationErrors = {
+  args: {
+    errors: {
+      name: 'Review this value.',
+    },
+    mode: 'edit',
+    values: {{ singularCamel }}FormValues,
+  },
+} satisfies Story
+
+export const Disabled = {
+  args: {
+    disabled: true,
+    mode: 'edit',
+    values: {{ singularCamel }}FormValues,
+  },
+} satisfies Story

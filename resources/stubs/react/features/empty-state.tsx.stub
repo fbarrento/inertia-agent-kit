@@ -1,0 +1,41 @@
+// {{ generatedMarker }}
+import { create } from '{{ routesImportPath }}'
+
+type {{ emptyStateComponent }}Props = {
+  actionLabel?: string
+  title?: string
+}
+
+export function {{ emptyStateComponent }}({
+  actionLabel = 'Create {{ singularStudly }}',
+  title = 'No {{ resourceName }} found',
+}: {{ emptyStateComponent }}Props) {
+  return (
+    <section className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md text-ds-default">
+      <div className="flex flex-col gap-ds-stack-sm">
+        <p className="text-ds-muted">{title}</p>
+        <a className="rounded-ds-control bg-ds-accent px-ds-control-x py-ds-control-y text-ds-accent-contrast" href={hrefFor(create)}>
+          {actionLabel}
+        </a>
+      </div>
+    </section>
+  )
+}
+
+function hrefFor(route: unknown): string {
+  if (typeof route !== 'function') {
+    return '#'
+  }
+
+  const result = (route as () => unknown)()
+
+  if (typeof result === 'string') {
+    return result
+  }
+
+  if (result && typeof result === 'object' && 'url' in result && typeof result.url === 'string') {
+    return result.url
+  }
+
+  return '#'
+}

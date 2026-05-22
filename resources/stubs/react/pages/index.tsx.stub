@@ -1,0 +1,45 @@
+// {{ generatedMarker }}
+import type {
+  {{ filtersType }},
+  {{ indexPagePropsType }},
+  {{ listItemType }},
+} from '{{ featureImportBase }}.types'
+import { {{ emptyStateComponent }} } from '{{ featureImportBase }}-empty-state'
+import { {{ filtersComponent }} } from '{{ featureImportBase }}-filters'
+import { {{ tableComponent }} } from '{{ featureImportBase }}-table'
+
+type Props = {{ indexPagePropsType }} & {
+  error?: string | null
+  filters?: Partial<{{ filtersType }}>
+  items?: Partial<{{ listItemType }}>[]
+  state?: 'empty' | 'error' | 'loading' | 'ready'
+}
+
+export default function {{ pageComponent }}(props: Props) {
+  const items = props.items ?? []
+
+  return (
+    <main className="bg-ds-canvas text-ds-default">
+      <section className="flex flex-col gap-ds-stack-md p-ds-inset-lg">
+        <header className="flex items-center justify-between gap-ds-stack-sm">
+          <div>
+            <h1 className="text-ds-heading">{{ pluralStudly }}</h1>
+            <p className="text-ds-muted">{{ controllerBasename }}@index</p>
+          </div>
+        </header>
+
+        <{{ filtersComponent }} filters={props.filters} />
+
+        {props.state === 'empty' ? (
+          <{{ emptyStateComponent }} />
+        ) : (
+          <{{ tableComponent }}
+            error={props.error}
+            isLoading={props.state === 'loading'}
+            items={items}
+          />
+        )}
+      </section>
+    </main>
+  )
+}

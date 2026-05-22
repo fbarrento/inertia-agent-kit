@@ -1,0 +1,101 @@
+// {{ generatedMarker }}
+import { useForm } from '@inertiajs/react'
+import type { FormEvent } from 'react'
+import { destroy, store, update } from '{{ actionsImportPath }}'
+import { create, edit, index, show } from '{{ routesImportPath }}'
+import type { {{ formValuesType }} } from '{{ localTypesImport }}'
+
+type {{ formComponent }}Props = {
+  disabled?: boolean
+  errors?: Record<string, string>
+  mode: 'create' | 'edit'
+  values?: Partial<{{ formValuesType }}>
+}
+
+export function {{ formComponent }}({
+  disabled = false,
+  errors = {},
+  mode,
+  values = {},
+}: {{ formComponent }}Props) {
+  const form = useForm<Partial<{{ formValuesType }}>>(values)
+  const fields = Object.entries(form.data as Record<string, unknown>)
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const endpoint = mode === 'create'
+      ? store()
+      : update(resourceIdentifier(values))
+
+    form.submit(endpoint as never)
+  }
+
+  return (
+    <form className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md text-ds-default" onSubmit={submit}>
+      <div className="flex flex-col gap-ds-stack-md">
+        {fields.length === 0 ? (
+          <p className="text-ds-muted">Generated backend form fields will render here.</p>
+        ) : (
+          fields.map(([field, value]) => (
+            <label className="flex flex-col gap-ds-stack-xs" key={field}>
+              <span className="text-ds-muted">{field}</span>
+              <input
+                className="rounded-ds-control border border-ds-border-default bg-ds-surface px-ds-control-x py-ds-control-y text-ds-default"
+                disabled={disabled}
+                name={field}
+                onChange={(event) => form.setData(field as never, event.target.value as never)}
+                value={String(value ?? '')}
+              />
+              {errors[field] ? <span className="text-ds-danger">{errors[field]}</span> : null}
+            </label>
+          ))
+        )}
+
+        <div className="flex items-center justify-between gap-ds-stack-sm">
+          <a className="text-ds-link" href={hrefFor(index)}>Cancel</a>
+          <div className="flex items-center gap-ds-stack-sm">
+            {mode === 'edit' ? (
+              <button
+                className="rounded-ds-control border border-ds-border-danger px-ds-control-x py-ds-control-y text-ds-danger"
+                disabled={disabled}
+                onClick={() => form.delete(hrefFor(destroy, values))}
+                type="button"
+              >
+                Delete
+              </button>
+            ) : null}
+            <button className="rounded-ds-control bg-ds-accent px-ds-control-x py-ds-control-y text-ds-accent-contrast" disabled={disabled} type="submit">
+              {mode === 'create' ? 'Create {{ singularStudly }}' : 'Update {{ singularStudly }}'}
+            </button>
+          </div>
+        </div>
+      </div>
+      <span className="hidden">{hrefFor(mode === 'create' ? create : edit)} {hrefFor(show, values)}</span>
+    </form>
+  )
+}
+
+function hrefFor(route: unknown, value?: unknown): string {
+  if (typeof route !== 'function') {
+    return '#'
+  }
+
+  const result = (route as (value?: unknown) => unknown)(value)
+
+  if (typeof result === 'string') {
+    return result
+  }
+
+  if (result && typeof result === 'object' && 'url' in result && typeof result.url === 'string') {
+    return result.url
+  }
+
+  return '#'
+}
+
+function resourceIdentifier(values: Partial<{{ formValuesType }}>): unknown {
+  const record = values as Record<string, unknown>
+
+  return record.id ?? record.uuid ?? record.slug
+}
