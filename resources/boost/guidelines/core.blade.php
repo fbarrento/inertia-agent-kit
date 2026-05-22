@@ -17,12 +17,13 @@ Required loop:
 3. Identify the affected route, page, feature, layout, or reusable component.
 4. Make the smallest coherent Inertia/frontend change.
 5. Run focused IAK checks and prefer `IAK_AGENT=1` plus `--json` output.
-6. Report changed files, commands, artifact paths, blockers, and remaining risk.
+6. For final handoff, create and validate `php artisan iak:handoff ... --json`.
+7. Report changed files, commands, artifact paths, blockers, and remaining risk.
 
 IAK Artisan surface: `iak:init`, `iak:make-resource`, `iak:audit`,
-`iak:feedback`, and `iak:verify`. Reference command JSON and artifact paths;
-do not paste large schemas, screenshots, DOM dumps, generated types, or
-framework documentation.
+`iak:feedback`, `iak:verify`, and `iak:handoff`. Reference command JSON and
+artifact paths; do not paste large logs, screenshots, DOM dumps, generated
+types, schemas, or framework documentation into chat.
 
 For any non-trivial Inertia UI change, feedback resolution, audit failure,
 verification failure, design-system/story evidence change, or final handoff,

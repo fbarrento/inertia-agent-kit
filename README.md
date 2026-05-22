@@ -25,6 +25,8 @@ php artisan iak:feedback list --json
 php artisan iak:feedback show fbk_... --json
 php artisan iak:feedback resolve fbk_... --summary "..." --evidence=.iak/runs/run_.../verify.json --json
 php artisan iak:verify --json
+php artisan iak:handoff create --task="..." --changed-file=feature:modify:resources/js/features/vehicles/vehicle-table.tsx --verify=.iak/runs/<run-id>/verify.json --tests=.iak/runs/<run-id>/tests.json --json
+php artisan iak:handoff validate .iak/runs/<run-id>/handoff.json --json
 ```
 
 ## First Milestone
