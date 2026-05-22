@@ -1,0 +1,39 @@
+// {{ generatedMarker }}
+import type { Meta, StoryObj } from '@storybook/react'
+import { {{ tableComponent }} } from '{{ localTableImport }}'
+import { {{ singularCamel }}ListItems } from '{{ localFixturesImport }}'
+
+const meta = {
+  component: {{ tableComponent }},
+  title: 'Resources/{{ pluralStudly }}/{{ tableComponent }}',
+} satisfies Meta<typeof {{ tableComponent }}>
+
+export default meta
+
+type Story = StoryObj<typeof meta>
+
+export const Default = {
+  args: {
+    items: {{ singularCamel }}ListItems,
+  },
+} satisfies Story
+
+export const Empty = {
+  args: {
+    items: [],
+  },
+} satisfies Story
+
+export const Loading = {
+  args: {
+    isLoading: true,
+    items: [],
+  },
+} satisfies Story
+
+export const Error = {
+  args: {
+    error: 'Unable to load {{ resourceName }}.',
+    items: [],
+  },
+} satisfies Story

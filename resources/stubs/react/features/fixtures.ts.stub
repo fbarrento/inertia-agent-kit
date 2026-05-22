@@ -1,0 +1,19 @@
+// {{ generatedMarker }}
+import type {
+  {{ filtersType }},
+  {{ formValuesType }},
+  {{ listItemType }},
+} from '{{ localTypesImport }}'
+
+export const {{ singularCamel }}ListItems = [
+  {
+    id: '{{ singularKebab }}-1',
+    displayName: 'Example {{ singularStudly }}',
+    statusLabel: 'Ready',
+    href: '#',
+  },
+] satisfies Partial<{{ listItemType }}>[]
+
+export const {{ singularCamel }}Filters = {} satisfies Partial<{{ filtersType }}>
+
+export const {{ singularCamel }}FormValues = {} satisfies Partial<{{ formValuesType }}>

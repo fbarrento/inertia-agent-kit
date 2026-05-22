@@ -1,0 +1,39 @@
+// {{ generatedMarker }}
+import type { {{ showPagePropsType }} } from '{{ featureImportBase }}.types'
+
+type Props = {{ showPagePropsType }} & {
+  description?: string
+  details?: Record<string, unknown>
+  title?: string
+}
+
+export default function {{ pageComponent }}(props: Props) {
+  const details = Object.entries(props.details ?? {})
+
+  return (
+    <main className="bg-ds-canvas text-ds-default">
+      <section className="flex flex-col gap-ds-stack-md p-ds-inset-lg">
+        <header className="flex flex-col gap-ds-stack-xs">
+          <p className="text-ds-muted">{{ controllerBasename }}@show</p>
+          <h1 className="text-ds-heading">{props.title ?? '{{ singularStudly }}'}</h1>
+          {props.description ? <p className="text-ds-muted">{props.description}</p> : null}
+        </header>
+
+        <section className="rounded-ds-control border border-ds-border-default bg-ds-surface p-ds-inset-md">
+          {details.length === 0 ? (
+            <p className="text-ds-muted">Backend-provided {{ singularKebab }} details will render here.</p>
+          ) : (
+            <dl className="grid gap-ds-stack-sm">
+              {details.map(([label, value]) => (
+                <div className="grid gap-ds-stack-xs" key={label}>
+                  <dt className="text-ds-muted">{label}</dt>
+                  <dd>{String(value ?? '')}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+      </section>
+    </main>
+  )
+}
