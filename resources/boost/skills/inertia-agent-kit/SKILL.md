@@ -45,7 +45,9 @@ resources refreshed.
 5. Run focused IAK checks with JSON output where possible:
    `php artisan iak:audit --json`, `php artisan iak:verify --json`, and
    `php artisan iak:feedback ... --json`.
-6. Report changed files, checks run, artifact paths, unresolved feedback,
+6. For final handoff, create and validate an `iak.handoff.v1` artifact with
+   `php artisan iak:handoff ... --json`.
+7. Report changed files, checks run, artifact paths, unresolved feedback,
    blockers, and remaining risk.
 
 ## Page And Resource Roles
@@ -131,10 +133,21 @@ manifest, feedback, design-system, and Storybook implications.
 
 ## Handoff Checklist
 
+Create final handoffs as JSON artifacts, then validate them before responding:
+
+```bash
+php artisan iak:handoff create --task="..." --changed-file=feature:modify:resources/js/features/vehicles/vehicle-table.tsx --verify=.iak/runs/<run-id>/verify.json --tests=.iak/runs/<run-id>/tests.json --json
+php artisan iak:handoff validate .iak/runs/<run-id>/handoff.json --json
+```
+
+Reference the handoff path in chat. Do not paste large logs, screenshots, DOM
+dumps, generated types, or schema bodies.
+
 End with:
 
 - Changed files.
 - IAK commands and other checks run.
+- Handoff artifact path when final handoff is needed.
 - Artifact paths for audit, verify, feedback, Storybook, screenshots, or tests.
 - Feedback IDs resolved or left open.
 - Blockers and remaining risk.

@@ -7,6 +7,7 @@ namespace InertiaAgentKit;
 use Illuminate\Support\ServiceProvider;
 use InertiaAgentKit\Console\AuditCommand;
 use InertiaAgentKit\Console\FeedbackCommand;
+use InertiaAgentKit\Console\HandoffCommand;
 use InertiaAgentKit\Console\InitCommand;
 use InertiaAgentKit\Console\MakeResourceCommand;
 use InertiaAgentKit\Console\VerifyCommand;
@@ -33,6 +34,7 @@ final class InertiaAgentKitServiceProvider extends ServiceProvider
             MakeResourceCommand::class,
             AuditCommand::class,
             FeedbackCommand::class,
+            HandoffCommand::class,
             VerifyCommand::class,
         ]);
     }

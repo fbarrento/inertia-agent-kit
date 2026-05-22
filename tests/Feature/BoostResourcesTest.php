@@ -33,13 +33,18 @@ it('suggests laravel boost as the agent substrate package', function (): void {
         ->toContain('guidelines and skills');
 });
 
-it('keeps the always loaded guideline concise', function (): void {
+it('keeps the boost resources concise', function (): void {
     $guideline = iakBoostResourceContents('resources/boost/guidelines/core.blade.php');
     $words = preg_split('/\s+/', trim($guideline)) ?: [];
     $lines = preg_split('/\R/', trim($guideline)) ?: [];
+    $skill = iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+    $skillWords = preg_split('/\s+/', trim($skill)) ?: [];
+    $skillLines = preg_split('/\R/', trim($skill)) ?: [];
 
     expect(count($words))->toBeLessThanOrEqual(260)
         ->and(count($lines))->toBeLessThanOrEqual(40)
+        ->and(count($skillWords))->toBeLessThanOrEqual(950)
+        ->and(count($skillLines))->toBeLessThanOrEqual(160)
         ->and($guideline)->toContain('consult the `inertia-agent-kit` skill');
 });
 
@@ -65,9 +70,11 @@ it('states the Boost and IAK boundary in each resource', function (string $path)
 ]);
 
 it('names the IAK artisan command surface', function (): void {
-    $combined = iakBoostResourceContents('resources/boost/guidelines/core.blade.php')
+    $guideline = iakBoostResourceContents('resources/boost/guidelines/core.blade.php');
+    $skill = iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+    $combined = $guideline
         ."\n"
-        .iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+        .$skill;
 
     expect($combined)
         ->toContain('iak:init')
@@ -75,8 +82,18 @@ it('names the IAK artisan command surface', function (): void {
         ->toContain('iak:audit')
         ->toContain('iak:feedback')
         ->toContain('iak:verify')
+        ->toContain('iak:handoff')
         ->toContain('--json')
         ->toContain('IAK_AGENT=1');
+
+    expect($guideline)
+        ->toContain('php artisan iak:handoff')
+        ->toContain('do not paste large logs');
+
+    expect($skill)
+        ->toContain('php artisan iak:handoff create')
+        ->toContain('php artisan iak:handoff validate')
+        ->toContain('Do not paste large logs');
 });
 
 it('does not define generic MCP tool documentation', function (string $path): void {

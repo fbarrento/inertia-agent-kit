@@ -56,17 +56,17 @@ Every command intended for agent workflows must support `--json`.
 
 | Command | Schema | Purpose |
 | --- | --- | --- |
-| `iak init --json` | `iak.manifest.v1` | Install or inspect project config and emit the resolved manifest. |
-| `iak manifest --json` | `iak.manifest.v1` | Read conventions, tokens, components, resources, commands, and schema locations. |
-| `iak plan --json` | `iak.plan.v1` | Generate a compact file plan before implementation. |
-| `iak plan validate <path> --json` | `iak.plan.v1` | Validate an agent-produced file plan. |
-| `iak audit --json` | `iak.audit.v1` | Report architecture, type, story, and style violations. |
-| `iak verify --json` | `iak.verify.v1` | Run verification and summarize evidence. |
-| `iak feedback list --json` | `iak.feedback.v1` | List pending or filtered feedback records. |
-| `iak feedback show <id> --json` | `iak.feedback.v1` | Return one feedback record and artifact references. |
-| `iak feedback resolve <id> --evidence <path> --json` | `iak.feedback.v1` | Resolve feedback only when evidence validates. |
-| `iak handoff create --json` | `iak.handoff.v1` | Create the final handoff artifact for the current run. |
-| `iak handoff validate <path> --json` | `iak.handoff.v1` | Validate a handoff artifact before final response. |
+| `php artisan iak:init --json` | `iak.manifest.v1` | Install or inspect project config and emit the resolved manifest. |
+| `php artisan iak:manifest --json` | `iak.manifest.v1` | Read conventions, tokens, components, resources, commands, and schema locations. |
+| `php artisan iak:plan --json` | `iak.plan.v1` | Generate a compact file plan before implementation. |
+| `php artisan iak:plan validate <path> --json` | `iak.plan.v1` | Validate an agent-produced file plan. |
+| `php artisan iak:audit --json` | `iak.audit.v1` | Report architecture, type, story, and style violations. |
+| `php artisan iak:verify --json` | `iak.verify.v1` | Run verification and summarize evidence. |
+| `php artisan iak:feedback list --json` | `iak.feedback.v1` | List pending or filtered feedback records. |
+| `php artisan iak:feedback show <id> --json` | `iak.feedback.v1` | Return one feedback record and artifact references. |
+| `php artisan iak:feedback resolve <id> --evidence=<path> --json` | `iak.feedback.v1` | Resolve feedback only when evidence validates. |
+| `php artisan iak:handoff create --json` | `iak.handoff.v1` | Create the final handoff artifact for the current run. |
+| `php artisan iak:handoff validate <path> --json` | `iak.handoff.v1` | Validate a handoff artifact before final response. |
 
 All paths in JSON output are relative to the Laravel project root unless the
 field is explicitly a URL. Commands must include `projectRoot` only in local
@@ -81,12 +81,13 @@ An agent changing UI follows this loop:
 2. Produce or validate `iak.plan.v1`.
 3. Scaffold files with IAK commands when available.
 4. Implement within the approved file plan.
-5. Run typecheck, lint, and `iak audit --json`.
+5. Run typecheck, lint, and `php artisan iak:audit --json`.
 6. Run Storybook tests where applicable.
 7. Run Pest Browser or Playwright for browser-visible changes.
 8. Inspect screenshot and console artifacts.
 9. Resolve human-in-the-loop feedback only with evidence.
-10. Create and validate `iak.handoff.v1`.
+10. Create `iak.handoff.v1` with `php artisan iak:handoff create ... --json`
+    and validate it with `php artisan iak:handoff validate <path> --json`.
 
 The handoff is invalid if it omits audit result, test result, Storybook story
 ID or inspected app URL, screenshot path, browser console result, accessibility
@@ -286,10 +287,11 @@ Example:
     }
   ],
   "commands": {
-    "plan": "iak plan --json",
-    "audit": "iak audit --json",
-    "verify": "iak verify --json",
-    "handoffValidate": "iak handoff validate <path> --json"
+    "plan": "php artisan iak:plan --json",
+    "audit": "php artisan iak:audit --json",
+    "verify": "php artisan iak:verify --json",
+    "handoffCreate": "php artisan iak:handoff create --json",
+    "handoffValidate": "php artisan iak:handoff validate <path> --json"
   },
   "schemas": {
     "plan": ".iak/schemas/iak.plan.v1.schema.json",
@@ -759,6 +761,13 @@ Verify rules:
 The handoff is the final source of truth for agent-to-agent continuation. A
 human final response can summarize it, but the handoff artifact is canonical.
 
+First-port creation and validation use the Laravel package command:
+
+```bash
+php artisan iak:handoff create --task="..." --changed-file=feature:modify:resources/js/features/vehicles/vehicle-table.tsx --verify=.iak/runs/<run-id>/verify.json --tests=.iak/runs/<run-id>/tests.json --json
+php artisan iak:handoff validate .iak/runs/<run-id>/handoff.json --json
+```
+
 Required fields:
 
 - `schema`
@@ -880,8 +889,8 @@ Handoff validation rules:
 
 Validation command:
 
-```txt
-iak handoff validate .iak/runs/<run-id>/handoff.json --json
+```bash
+php artisan iak:handoff validate .iak/runs/<run-id>/handoff.json --json
 ```
 
 Validation failure example:
@@ -900,7 +909,7 @@ Validation failure example:
     {
       "type": "fix",
       "summary": "Run browser verification and attach a screenshot artifact.",
-      "command": "iak verify --json"
+      "command": "php artisan iak:verify --json"
     }
   ],
   "errors": [
@@ -920,10 +929,10 @@ Laravel Boost as the generic agent substrate.
 Recommended install flow:
 
 ```txt
-composer require inertia-agent-kit/laravel --dev
-php artisan inertia-agent-kit:install
+composer require fbarrento/inertia-agent-kit --dev
+php artisan iak:init --json
 php artisan boost:install
-npm install -D @inertia-agent-kit/storybook @inertia-agent-kit/adapter-react
+php artisan boost:update
 ```
 
 IAK package responsibilities:
@@ -934,6 +943,8 @@ IAK package responsibilities:
 - Register dev-only feedback routes.
 - Provide package Boost guidelines and skills.
 - Publish JSON Schemas for this contract.
+- Create and validate final `iak.handoff.v1` artifacts through
+  `php artisan iak:handoff ... --json`.
 - Expose IAK-specific MCP tools when needed.
 
 Boost responsibilities:

@@ -35,6 +35,8 @@ php artisan iak:feedback list --json
 php artisan iak:feedback show fbk_... --json
 php artisan iak:feedback resolve fbk_... --evidence=.iak/runs/run_.../verify.json --json
 php artisan iak:verify --json
+php artisan iak:handoff create --task="..." --changed-file=feature:modify:resources/js/features/vehicles/vehicle-table.tsx --verify=.iak/runs/<run-id>/verify.json --tests=.iak/runs/<run-id>/tests.json --json
+php artisan iak:handoff validate .iak/runs/<run-id>/handoff.json --json
 ```
 
 Package tests use Pest with Orchestra Testbench. If dependencies are missing,
@@ -87,6 +89,7 @@ The first Laravel package baseline implements:
 - `iak:audit --json`;
 - `iak:feedback list/show/resolve --json`;
 - `iak:verify --json`;
+- `iak:handoff create/validate --json`;
 - Boost guidance resources;
 - Testbench/Pest coverage for package boot and command slices.
 
@@ -96,6 +99,6 @@ Still pending:
 - real Pest Browser and Playwright execution;
 - Storybook addon;
 - MCP server;
-- `iak.handoff.v1` create/validate commands.
+- full `iak.handoff.v1` schema coverage beyond first-port create/validate.
 
 Keep new work aligned with `docs/inertia-agent-kit/implementation-rfc.md`.
