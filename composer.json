@@ -20,6 +20,9 @@
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"
     },
+    "suggest": {
+        "laravel/boost": "Discovers package-provided Inertia Agent Kit guidelines and skills for Laravel-aware agents."
+    },
     "autoload": {
         "psr-4": {
             "InertiaAgentKit\\": "src/"

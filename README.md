@@ -54,6 +54,22 @@ The original Node CLI prototype remains in `src/iak.mjs` and `bin/iak.mjs` as a
 reference during the port. The product surface is now the Laravel package and
 Artisan commands.
 
+## Laravel Boost
+
+IAK ships package-provided Boost resources:
+
+- `resources/boost/guidelines/core.blade.php`
+- `resources/boost/skills/inertia-agent-kit/SKILL.md`
+
+Install or refresh Boost in the consuming Laravel app so those resources are
+discovered:
+
+```bash
+composer require laravel/boost --dev
+php artisan boost:install
+php artisan boost:update
+```
+
 ## Local Artifacts
 
 IAK writes local agent/runtime state under `.iak/`. The repository ignores

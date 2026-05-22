@@ -21,6 +21,18 @@ it('ships package boost resource files', function (): void {
         ->and(iakBoostResourcePath('resources/boost/skills/inertia-agent-kit/SKILL.md'))->toBeFile();
 });
 
+it('suggests laravel boost as the agent substrate package', function (): void {
+    $composer = json_decode(
+        file_get_contents(iakBoostResourcePath('composer.json')) ?: '',
+        true,
+        512,
+        JSON_THROW_ON_ERROR,
+    );
+
+    expect($composer['suggest']['laravel/boost'] ?? null)
+        ->toContain('guidelines and skills');
+});
+
 it('keeps the always loaded guideline concise', function (): void {
     $guideline = iakBoostResourceContents('resources/boost/guidelines/core.blade.php');
     $words = preg_split('/\s+/', trim($guideline)) ?: [];
