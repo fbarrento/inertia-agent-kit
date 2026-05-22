@@ -10,6 +10,7 @@ it('boots and merges package config defaults', function (): void {
         ->and(config('inertia-agent-kit.paths.root'))->toBe('resources/js')
         ->and(config('inertia-agent-kit.generated.type_alias'))->toBe('@/types/generated')
         ->and(config('inertia-agent-kit.json_schemas.audit'))->toBe('iak.audit.v1')
+        ->and(config('inertia-agent-kit.json_schemas.handoff'))->toBe('iak.handoff.v1')
         ->and(config('inertia-agent-kit.feedback.statuses'))->toBe([
             'pending',
             'in_progress',
@@ -49,6 +50,7 @@ it('registers the intended artisan command names', function (): void {
         'iak:make-resource',
         'iak:audit',
         'iak:feedback',
+        'iak:handoff',
         'iak:verify',
     );
 });
@@ -63,5 +65,6 @@ it('registers json-capable command definitions', function (string $command): voi
     'make-resource' => 'iak:make-resource',
     'audit' => 'iak:audit',
     'feedback' => 'iak:feedback',
+    'handoff' => 'iak:handoff',
     'verify' => 'iak:verify',
 ]);

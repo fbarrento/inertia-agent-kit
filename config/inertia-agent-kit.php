@@ -90,6 +90,7 @@ return [
         'audit' => 'iak.audit.v1',
         'audit_completed' => 'iak.audit.completed',
         'feedback' => 'iak.feedback.v1',
+        'handoff' => 'iak.handoff.v1',
         'verify' => 'iak.verify.v1',
     ],
 ];
