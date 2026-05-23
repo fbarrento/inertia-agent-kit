@@ -9,7 +9,7 @@ use RuntimeException;
 final class FeedbackException extends RuntimeException
 {
     /**
-     * @param array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
     public function __construct(
         private readonly string $errorCode,

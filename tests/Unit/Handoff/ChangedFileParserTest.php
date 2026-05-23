@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use InertiaAgentKit\Handoff\ChangedFileParser;
 
-it('groups valid changed file entries by role', function (): void {
-    $result = (new ChangedFileParser())->parse([
+test('groups valid changed file entries by role', function (): void {
+    $result = (new ChangedFileParser)->parse([
         'feature:modify:resources/js/features/vehicles/vehicle-table.tsx',
         'component-ui:create:resources/js/components/ui/button.tsx',
         'docs:delete:docs/inertia-agent-kit/handoff.md',
@@ -28,8 +28,8 @@ it('groups valid changed file entries by role', function (): void {
         ]);
 });
 
-it('reports invalid roles actions and unsafe paths', function (): void {
-    $result = (new ChangedFileParser())->parse([
+test('rejects invalid roles actions and unsafe paths', function (): void {
+    $result = (new ChangedFileParser)->parse([
         'unknown:modify:resources/js/features/vehicles/table.tsx',
         'feature:touch:resources/js/features/vehicles/table.tsx',
         'feature:modify:/etc/passwd',
@@ -41,7 +41,7 @@ it('reports invalid roles actions and unsafe paths', function (): void {
     $codes = array_column($result['errors'], 'code');
     $reasons = array_values(array_filter(array_map(
         static fn (array $error): ?string => $error['details']['reason'] ?? null,
-        $result['errors']
+        $result['errors'],
     )));
 
     expect($result['changedFiles'])->toBe([])
@@ -54,8 +54,8 @@ it('reports invalid roles actions and unsafe paths', function (): void {
         ->and($reasons)->toContain('empty');
 });
 
-it('allows colons inside the project relative path', function (): void {
-    $result = (new ChangedFileParser())->parse([
+test('allows colons inside the project relative path', function (): void {
+    $result = (new ChangedFileParser)->parse([
         'feature:modify:resources/js/features/time:zone-picker.tsx',
     ]);
 
@@ -66,12 +66,35 @@ it('allows colons inside the project relative path', function (): void {
         ]);
 });
 
-it('rejects malformed entries before parsing role action and path', function (): void {
-    $result = (new ChangedFileParser())->parse([
+test('rejects malformed entries before parsing role action and path', function (): void {
+    $result = (new ChangedFileParser)->parse([
         'feature:modify',
     ]);
 
     expect($result['changedFiles'])->toBe([])
         ->and($result['errors'])->toHaveCount(1)
         ->and($result['errors'][0]['code'])->toBe('changed_file.invalid_format');
+});
+
+test('rejects null bytes in path', function (): void {
+    $result = (new ChangedFileParser)->parse([
+        "feature:modify:resources/js/\0bad.ts",
+    ]);
+
+    expect($result['changedFiles'])->toBe([])
+        ->and($result['errors'])->toHaveCount(1)
+        ->and($result['errors'][0]['details']['reason'])->toBe('null_byte');
+});
+
+test('skips empty and current-directory segments and rejects zero segment paths', function (): void {
+    $result = (new ChangedFileParser)->parse([
+        'feature:modify:././',
+        'feature:modify:/..',
+        'feature:modify:./..',
+    ]);
+
+    expect($result['changedFiles'])->toBe([])
+        ->and($result['errors'][0]['details']['reason'])->toBe('empty')
+        ->and($result['errors'][1]['details']['reason'])->toBe('absolute')
+        ->and($result['errors'][2]['details']['reason'])->toBe('traversal');
 });

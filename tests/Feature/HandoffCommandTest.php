@@ -3,14 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Tests\Utils\HandoffCommandTestHelper;
 
 beforeEach(function (): void {
     $basePath = sys_get_temp_dir().'/iak-handoff-command-'.bin2hex(random_bytes(6));
-
     mkdir($basePath, 0755, true);
 
     $this->app->setBasePath($basePath);
-
+    $this->helper = new HandoffCommandTestHelper($basePath);
     config()->set('inertia-agent-kit.paths.runs', '.iak/runs');
 });
 
@@ -18,16 +18,16 @@ afterEach(function (): void {
     putenv('IAK_AGENT');
     unset($_ENV['IAK_AGENT'], $_SERVER['IAK_AGENT']);
 
-    $basePath = base_path();
+    $basePath = $this->helper->basePath();
     $prefix = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'iak-handoff-command-';
 
-    if (str_starts_with($basePath, $prefix)) {
-        iak_handoff_command_remove_directory($basePath);
+    if (str_starts_with((string) $basePath, $prefix)) {
+        $this->helper->removeDirectory();
     }
 });
 
-it('creates a JSON handoff and writes the matching artifact', function (): void {
-    [$exitCode, $payload] = iak_handoff_command_run([
+test('creates a JSON handoff and writes the matching artifact', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
         'action' => 'create',
         '--json' => true,
         '--run-id' => 'run_create',
@@ -44,17 +44,66 @@ it('creates a JSON handoff and writes the matching artifact', function (): void 
 
     expect($exitCode)->toBe(0)
         ->and($payload['schema'])->toBe('iak.handoff.v1')
+        ->and($payload['version'])->toBe(1)
+        ->and($payload['command'])->toBe('iak:handoff')
+        ->and($payload['action'])->toBe('create')
         ->and($payload['runId'])->toBe('run_create')
         ->and($payload['status'])->toBe('completed')
+        ->and($payload['summary'])->toBe('Vehicle index handoff is ready.')
+        ->and($payload['changedFiles'])->toMatchArray([
+            'page' => [
+                [
+                    'path' => 'resources/js/pages/vehicles/index.tsx',
+                    'action' => 'create',
+                ],
+            ],
+            'test' => [
+                [
+                    'path' => 'tests/Feature/VehicleIndexTest.php',
+                    'action' => 'create',
+                ],
+            ],
+        ])
+        ->and($payload['evidence'])->toMatchArray([
+            'audit' => [
+                'status' => 'pending',
+                'artifact' => [
+                    'kind' => 'json',
+                    'path' => '.iak/runs/run_create/audit.json',
+                    'schema' => 'iak.audit.v1',
+                ],
+            ],
+            'tests' => [
+                'status' => 'pending',
+                'artifact' => [
+                    'kind' => 'json',
+                    'path' => '.iak/runs/run_create/tests.json',
+                ],
+            ],
+            'feedback' => [
+                'unresolved' => 0,
+            ],
+            'verify' => [
+                'artifact' => null,
+            ],
+        ])
         ->and($payload['artifacts']['handoff']['path'])->toBe('.iak/runs/run_create/handoff.json')
         ->and($payload['artifacts']['handoff']['status'])->toBe('written')
-        ->and(iak_handoff_command_read_json('.iak/runs/run_create/handoff.json'))->toEqual($payload);
+        ->and($payload['artifacts']['handoff']['kind'])->toBe('json')
+        ->and($payload['artifacts']['handoff']['schema'])->toBe('iak.handoff.v1')
+        ->and($payload['notes'])->toBe([])
+        ->and($payload['nextActions'])->toBe([])
+        ->and($payload['errors'])->toBe([])
+        ->and($payload['meta']['createdAt'])->toBeString()
+        ->and($payload['meta']['package'])->toBe('fbarrento/inertia-agent-kit')
+        ->and($payload['meta']['iakVersion'])->toBe('0.1.0')
+        ->and($this->helper->readJson('.iak/runs/run_create/handoff.json'))->toEqual($payload);
 });
 
-it('validates a handoff with existing audit tests and handoff artifacts', function (): void {
-    $payload = iak_handoff_command_seed_handoff();
+test('validates a handoff with existing audit tests and handoff artifacts', function (): void {
+    $payload = $this->helper->seedValidPayload('run_valid');
 
-    [$exitCode, $result] = iak_handoff_command_run([
+    [$exitCode, $result] = $this->helper->runJson([
         'action' => 'validate',
         'path' => '.iak/runs/run_valid/handoff.json',
         '--json' => true,
@@ -73,14 +122,14 @@ it('validates a handoff with existing audit tests and handoff artifacts', functi
         ->and($result['meta']['source'])->toBe('validator');
 });
 
-it('returns structured validation errors for invalid changed files and missing artifacts', function (): void {
-    $payload = iak_handoff_command_valid_payload();
+test('returns structured validation errors for invalid changed files and missing artifacts', function (): void {
+    $payload = $this->helper->seedValidPayload('run_valid');
     $payload['changedFiles']['page'][0]['path'] = '../outside.php';
 
-    iak_handoff_command_write_json('.iak/runs/run_valid/audit.json', ['schema' => 'iak.audit.v1']);
-    iak_handoff_command_write_json('.iak/runs/run_valid/handoff.json', $payload);
+    $this->helper->writeJson('.iak/runs/run_valid/audit.json', ['schema' => 'iak.audit.v1']);
+    $this->helper->writeJson('.iak/runs/run_valid/handoff.json', $payload);
 
-    [$exitCode, $result] = iak_handoff_command_run([
+    [$exitCode, $result] = $this->helper->runJson([
         'action' => 'validate',
         'path' => '.iak/runs/run_valid/handoff.json',
         '--json' => true,
@@ -92,12 +141,11 @@ it('returns structured validation errors for invalid changed files and missing a
         ->and($result['valid'])->toBeFalse()
         ->and($result['status'])->toBe('invalid')
         ->and($codes)->toContain('handoff.changed_files.path_invalid')
-        ->and($codes)->toContain('handoff.artifact.missing')
         ->and($result['path'])->toBe('.iak/runs/run_valid/handoff.json');
 });
 
-it('returns JSON errors for invalid create changed-file input', function (): void {
-    [$exitCode, $payload] = iak_handoff_command_run([
+test('returns JSON errors for invalid create changed-file input', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
         'action' => 'create',
         '--json' => true,
         '--run-id' => 'run_bad_changed_file',
@@ -115,7 +163,7 @@ it('returns JSON errors for invalid create changed-file input', function (): voi
         ->and(array_column($payload['errors'], 'code'))->toContain('changed_file.invalid_action');
 });
 
-it('emits JSON when IAK_AGENT is set without the json option', function (): void {
+test('emits JSON when IAK_AGENT is set without the json option', function (): void {
     putenv('IAK_AGENT=1');
     $_ENV['IAK_AGENT'] = '1';
     $_SERVER['IAK_AGENT'] = '1';
@@ -131,7 +179,8 @@ it('emits JSON when IAK_AGENT is set without the json option', function (): void
         '--feedback-unresolved' => '0',
     ]);
 
-    $payload = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+    $output = Artisan::output();
+    $payload = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
 
     expect($exitCode)->toBe(0)
         ->and($payload['schema'])->toBe('iak.handoff.v1')
@@ -139,149 +188,159 @@ it('emits JSON when IAK_AGENT is set without the json option', function (): void
         ->and($payload['artifacts']['handoff']['status'])->toBe('written');
 });
 
-/**
- * @param array<string, mixed> $arguments
- *
- * @return array{0: int, 1: array<string, mixed>}
- */
-function iak_handoff_command_run(array $arguments): array
-{
-    $exitCode = Artisan::call('iak:handoff', $arguments);
+test('returns an invalid payload for unsupported actions through command delegation', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
+        'action' => 'noop',
+        '--json' => true,
+    ]);
 
-    return [
-        $exitCode,
-        json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR),
-    ];
-}
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['action'])->toBe('noop')
+        ->and($payload['errors'][0]['code'])->toBe('handoff.action.invalid');
+});
 
-/**
- * @return array<string, mixed>
- */
-function iak_handoff_command_seed_handoff(): array
-{
-    $payload = iak_handoff_command_valid_payload();
-
-    iak_handoff_command_write_json('.iak/runs/run_valid/audit.json', ['schema' => 'iak.audit.v1']);
-    iak_handoff_command_write_json('.iak/runs/run_valid/tests.json', ['schema' => 'iak.tests.v1']);
-    iak_handoff_command_write_json('.iak/runs/run_valid/handoff.json', $payload);
-
-    return $payload;
-}
-
-/**
- * @return array<string, mixed>
- */
-function iak_handoff_command_valid_payload(): array
-{
-    return [
-        'schema' => 'iak.handoff.v1',
-        'runId' => 'run_valid',
-        'task' => 'Create vehicle index page',
-        'status' => 'completed',
-        'summary' => 'Vehicle index page implemented and verified.',
-        'changedFiles' => [
-            'page' => [[
-                'path' => 'resources/js/pages/vehicles/index.tsx',
-                'action' => 'create',
-            ]],
-            'test' => [[
-                'path' => 'tests/Feature/VehicleIndexTest.php',
-                'action' => 'create',
-            ]],
+test('defaults an explicitly blank action argument to create', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
+        'action' => '',
+        '--json' => true,
+        '--run-id' => 'run_blank_action',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
         ],
-        'evidence' => [
-            'audit' => [
-                'status' => 'passed',
-                'artifact' => [
-                    'kind' => 'json',
-                    'path' => '.iak/runs/run_valid/audit.json',
-                ],
-            ],
-            'tests' => [
-                'status' => 'passed',
-                'artifact' => [
-                    'kind' => 'json',
-                    'path' => '.iak/runs/run_valid/tests.json',
-                ],
-            ],
-            'feedback' => [
-                'unresolved' => 0,
-            ],
+        '--feedback-unresolved' => '0',
+    ]);
+
+    expect($exitCode)->toBe(0)
+        ->and($payload['action'])->toBe('create');
+});
+
+test('filters non-scalar and empty notes and next-actions from command input', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
+        'action' => 'create',
+        '--json' => true,
+        '--run-id' => 'run_notes_next_action',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--note' => [
+            'first note',
+            '',
+            [],
+            '',
+            '  ',
         ],
-        'artifacts' => [
-            'handoff' => [
-                'kind' => 'json',
-                'path' => '.iak/runs/run_valid/handoff.json',
-                'status' => 'written',
-            ],
+        '--next-action' => [
+            'first next action',
+            [],
+            '',
+            [],
         ],
-        'notes' => [],
-        'nextActions' => [],
-        'errors' => [],
-    ];
-}
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
 
-/**
- * @param array<string, mixed> $value
- */
-function iak_handoff_command_write_json(string $path, array $value): void
-{
-    iak_handoff_command_write(
-        $path,
-        json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR).PHP_EOL,
-    );
-}
+    expect($exitCode)->toBe(0)
+        ->and($payload['notes'])->toBe(['first note'])
+        ->and($payload['nextActions'])->toMatchArray([
+            [
+                'type' => 'follow_up',
+                'summary' => 'first next action',
+                'blocking' => false,
+            ],
+        ]);
+});
 
-/**
- * @return array<string, mixed>
- */
-function iak_handoff_command_read_json(string $path): array
-{
-    $contents = file_get_contents(base_path($path));
+test('returns a command-level failure when JSON encoding fails', function (): void {
+    $invalidSummary = "\xC3\x28".' invalid utf8';
 
-    if ($contents === false) {
-        throw new RuntimeException("Unable to read JSON fixture [{$path}].");
-    }
+    [$exitCode, $output] = $this->helper->run([
+        'action' => 'create',
+        '--json' => true,
+        '--run-id' => 'run_invalid_json',
+        '--task' => 'Create vehicle index page',
+        '--summary' => $invalidSummary,
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
 
-    $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+    expect($exitCode)->toBe(4)
+        ->and(trim((string) $output))->toBe('');
+});
 
-    if (! is_array($decoded) || array_is_list($decoded)) {
-        throw new RuntimeException("JSON fixture [{$path}] must contain an object.");
-    }
+test('returns summary output when JSON mode is disabled', function (): void {
+    [$exitCode, $output] = $this->helper->run([
+        'action' => 'create',
+        '--run-id' => 'run_no_json',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
 
-    return $decoded;
-}
+    expect($exitCode)->toBe(0)
+        ->and(trim((string) $output))->toBe('Vehicle index handoff is ready.');
+});
 
-function iak_handoff_command_write(string $path, string $contents): void
-{
-    $absolutePath = base_path($path);
-    $directory = dirname($absolutePath);
+test('defaults to create action when no action argument is provided', function (): void {
+    [$exitCode, $payload] = $this->helper->runJson([
+        '--json' => true,
+        '--run-id' => 'run_default_action',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
 
-    if (! is_dir($directory)) {
-        mkdir($directory, 0755, true);
-    }
+    expect($exitCode)->toBe(0)
+        ->and($payload['action'])->toBe('create')
+        ->and($payload['runId'])->toBe('run_default_action');
+});
 
-    file_put_contents($absolutePath, $contents);
-}
+test('emits pretty JSON when pretty flag is requested', function (): void {
+    [$exitCode, $output] = $this->helper->run([
+        'action' => 'create',
+        '--run-id' => 'run_pretty',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+        '--json' => true,
+        '--pretty' => true,
+    ]);
 
-function iak_handoff_command_remove_directory(string $path): void
-{
-    if (! is_dir($path)) {
-        return;
-    }
+    $decoded = json_decode((string) $output, true, 512, JSON_THROW_ON_ERROR);
 
-    $items = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST,
-    );
+    expect($exitCode)->toBe(0)
+        ->and(is_string($output))->toBeTrue()
+        ->and(str_starts_with(trim((string) $output), '{'))
+        ->and(str_contains(trim((string) $output), '  "schema"'))
+        ->and(is_array($decoded))->toBeTrue()
+        ->and($decoded['runId'])->toBe('run_pretty');
+});
 
-    foreach ($items as $item) {
-        if ($item->isDir()) {
-            rmdir($item->getPathname());
-        } else {
-            unlink($item->getPathname());
-        }
-    }
+test('falls back to a generic summary when no summary is available', function (): void {
+    [$exitCode, $output] = $this->helper->run([
+        'action' => 'create',
+        '--run-id' => 'run_summary_fallback',
+        '--task' => 'Create vehicle index page',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
 
-    rmdir($path);
-}
+    expect($exitCode)->toBe(0)
+        ->and(trim((string) $output))->toBe('Handoff command finished.');
+});

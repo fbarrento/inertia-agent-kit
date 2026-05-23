@@ -7,13 +7,13 @@ namespace InertiaAgentKit\Support;
 use JsonException;
 use RuntimeException;
 
-final class Files
+final readonly class Files
 {
-    private readonly ProjectPaths $paths;
+    private ProjectPaths $paths;
 
     public function __construct(?ProjectPaths $paths = null)
     {
-        $this->paths = $paths ?? new ProjectPaths();
+        $this->paths = $paths ?? new ProjectPaths;
     }
 
     public function ensureDirectory(string $path): string
@@ -50,7 +50,7 @@ final class Files
     }
 
     /**
-     * @param array<string, mixed> $value
+     * @param  array<string, mixed>  $value
      *
      * @throws JsonException
      */
@@ -84,10 +84,10 @@ final class Files
 
         $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
-        if (! is_array($decoded)) {
-            throw new RuntimeException("JSON file [{$path}] must contain an object or array.");
+        if (! is_array($decoded) || (array_is_list($decoded) && $decoded !== [])) {
+            throw new RuntimeException("JSON file [{$path}] must contain an object.");
         }
 
-        return $decoded;
+        return ArrayData::stringMap($decoded);
     }
 }

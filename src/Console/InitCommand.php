@@ -7,6 +7,7 @@ namespace InertiaAgentKit\Console;
 use Illuminate\Console\Command;
 use InertiaAgentKit\Console\Concerns\EmitsJson;
 use InertiaAgentKit\Init\Initializer;
+use InertiaAgentKit\Support\ArrayData;
 use JsonException;
 
 final class InitCommand extends Command
@@ -27,7 +28,7 @@ final class InitCommand extends Command
     public function handle(): int
     {
         $result = (new Initializer($this->laravel))->run(
-            (string) $this->option('adapter'),
+            $this->nullableOption('adapter') ?? 'react',
             (bool) $this->option('force'),
         );
 
@@ -43,8 +44,22 @@ final class InitCommand extends Command
             return $result['exitCode'];
         }
 
-        $this->line((string) ($result['payload']['summary'] ?? 'IAK init completed.'));
+        $payload = $result['payload'];
+        $this->line(ArrayData::stringAt($payload, ['summary'], 'IAK init completed.'));
 
         return $result['exitCode'];
+    }
+
+    private function nullableOption(string $name): ?string
+    {
+        $value = $this->option($name);
+
+        if (! is_scalar($value) || is_bool($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }

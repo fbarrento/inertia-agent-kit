@@ -947,6 +947,21 @@ IAK package responsibilities:
   `php artisan iak:handoff ... --json`.
 - Expose IAK-specific MCP tools when needed.
 
+Package architecture during the flat refactor:
+
+- Support Laravel 12 and 13 only.
+- `src/Actions/*` classes have one responsibility, one public `handle()` method,
+  and constructor-injected dependencies.
+- `src/Data/*` classes are JSON schema output objects that implement
+  `JsonSerializable` and preserve the exact versioned contract.
+- `src/Enum/*` owns fixed vocabularies; do not duplicate private string const
+  lists for roles, actions, statuses, artifact kinds, or schema names.
+- `src/Console/*` stays thin and delegates validation, file IO, schema
+  assembly, and persistence to actions.
+- `src/Support/*` contains generic helpers only.
+- Refactor readiness requires PHPStan at max level and Rector dry-run in
+  addition to focused package tests.
+
 Boost responsibilities:
 
 - Laravel, package, and version-aware documentation.

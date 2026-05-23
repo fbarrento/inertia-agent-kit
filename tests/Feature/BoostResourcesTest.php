@@ -2,28 +2,16 @@
 
 declare(strict_types=1);
 
-function iakBoostResourcePath(string $path): string
-{
-    return dirname(__DIR__, 2).'/'.$path;
-}
+use Tests\Utils\BoostResource;
 
-function iakBoostResourceContents(string $path): string
-{
-    $contents = file_get_contents(iakBoostResourcePath($path));
-
-    expect($contents)->not->toBeFalse();
-
-    return (string) $contents;
-}
-
-it('ships package boost resource files', function (): void {
-    expect(iakBoostResourcePath('resources/boost/guidelines/core.blade.php'))->toBeFile()
-        ->and(iakBoostResourcePath('resources/boost/skills/inertia-agent-kit/SKILL.md'))->toBeFile();
+test('ships package boost resource files', function (): void {
+    expect(BoostResource::path('resources/boost/guidelines/core.blade.php'))->toBeFile()
+        ->and(BoostResource::path('resources/boost/skills/inertia-agent-kit/SKILL.md'))->toBeFile();
 });
 
-it('suggests laravel boost as the agent substrate package', function (): void {
+test('suggests laravel boost as the agent substrate package', function (): void {
     $composer = json_decode(
-        file_get_contents(iakBoostResourcePath('composer.json')) ?: '',
+        file_get_contents(BoostResource::path('composer.json')) ?: '',
         true,
         512,
         JSON_THROW_ON_ERROR,
@@ -33,11 +21,11 @@ it('suggests laravel boost as the agent substrate package', function (): void {
         ->toContain('guidelines and skills');
 });
 
-it('keeps the boost resources concise', function (): void {
-    $guideline = iakBoostResourceContents('resources/boost/guidelines/core.blade.php');
+test('keeps the boost resources concise', function (): void {
+    $guideline = BoostResource::contents('resources/boost/guidelines/core.blade.php');
     $words = preg_split('/\s+/', trim($guideline)) ?: [];
     $lines = preg_split('/\R/', trim($guideline)) ?: [];
-    $skill = iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+    $skill = BoostResource::contents('resources/boost/skills/inertia-agent-kit/SKILL.md');
     $skillWords = preg_split('/\s+/', trim($skill)) ?: [];
     $skillLines = preg_split('/\R/', trim($skill)) ?: [];
 
@@ -48,8 +36,8 @@ it('keeps the boost resources concise', function (): void {
         ->and($guideline)->toContain('consult the `inertia-agent-kit` skill');
 });
 
-it('states the Boost and IAK boundary in each resource', function (string $path): void {
-    $content = iakBoostResourceContents($path);
+test('states the Boost and IAK boundary in each resource', function (string $path): void {
+    $content = BoostResource::contents($path);
 
     expect($content)
         ->toContain('Boost')
@@ -69,9 +57,9 @@ it('states the Boost and IAK boundary in each resource', function (string $path)
     'IAK skill' => 'resources/boost/skills/inertia-agent-kit/SKILL.md',
 ]);
 
-it('names the IAK artisan command surface', function (): void {
-    $guideline = iakBoostResourceContents('resources/boost/guidelines/core.blade.php');
-    $skill = iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+test('names the IAK artisan command surface', function (): void {
+    $guideline = BoostResource::contents('resources/boost/guidelines/core.blade.php');
+    $skill = BoostResource::contents('resources/boost/skills/inertia-agent-kit/SKILL.md');
     $combined = $guideline
         ."\n"
         .$skill;
@@ -96,8 +84,34 @@ it('names the IAK artisan command surface', function (): void {
         ->toContain('Do not paste large logs');
 });
 
-it('does not define generic MCP tool documentation', function (string $path): void {
-    $content = iakBoostResourceContents($path);
+test('documents the flat package refactor guidance in boost resources', function (): void {
+    $guideline = BoostResource::contents('resources/boost/guidelines/core.blade.php');
+    $skill = BoostResource::contents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+    $combined = $guideline
+        ."\n"
+        .$skill;
+
+    expect($combined)
+        ->toContain('Laravel 12')
+        ->toContain('13')
+        ->toContain('src/Actions/*')
+        ->toContain('one public `handle()`')
+        ->toContain('constructor injection')
+        ->toContain('src/Data/*')
+        ->toContain('JsonSerializable')
+        ->toContain('src/Enum/*')
+        ->toContain('fixed vocabularies')
+        ->toContain('private string const lists')
+        ->toContain('src/Console/*')
+        ->toContain('input/output')
+        ->toContain('src/Support/*')
+        ->toContain('reusable helpers')
+        ->toContain('PHPStan at max level')
+        ->toContain('Rector dry-run');
+});
+
+test('does not define generic MCP tool documentation', function (string $path): void {
+    $content = BoostResource::contents($path);
 
     $forbiddenDefinitionPatterns = [
         '/^#{1,6}\s*(app info|application info|docs search|route list|database schema|database query|logs|browser logs|absolute url|last error)\b/mi',
@@ -113,8 +127,8 @@ it('does not define generic MCP tool documentation', function (string $path): vo
     'IAK skill' => 'resources/boost/skills/inertia-agent-kit/SKILL.md',
 ]);
 
-it('gives the IAK skill trigger focused frontmatter', function (): void {
-    $skill = iakBoostResourceContents('resources/boost/skills/inertia-agent-kit/SKILL.md');
+test('gives the IAK skill trigger focused frontmatter', function (): void {
+    $skill = BoostResource::contents('resources/boost/skills/inertia-agent-kit/SKILL.md');
 
     expect((bool) preg_match('/\A---\R(?<frontmatter>.*?)\R---\R/s', $skill, $matches))->toBeTrue();
 

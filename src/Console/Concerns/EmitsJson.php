@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 trait EmitsJson
 {
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     protected function respond(array $payload, ?string $line = null, int $status = Command::SUCCESS): int
     {
@@ -34,7 +34,7 @@ trait EmitsJson
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     protected function emitJson(array $payload, int $status = Command::SUCCESS): int
     {

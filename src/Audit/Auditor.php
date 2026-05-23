@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace InertiaAgentKit\Audit;
 
 use Illuminate\Contracts\Foundation\Application;
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\ProjectPaths;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
-final class Auditor
+final readonly class Auditor
 {
     /**
      * @var array<string, array{category: string, severity: string, summary: string}>
@@ -121,7 +122,7 @@ final class Auditor
         'vendor',
     ];
 
-    private readonly ProjectPaths $paths;
+    private ProjectPaths $paths;
 
     public function __construct(Application $app)
     {
@@ -129,8 +130,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array{
      *     status: string,
      *     totals: array<string, int>,
@@ -177,9 +177,9 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
+     * @param  array<string, mixed>  $config
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanDesignSystem(array $config, array &$stats, array &$violations): void
     {
@@ -208,7 +208,7 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanArbitraryValues(string $path, string $source, array &$violations): void
     {
@@ -237,7 +237,7 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanRawHex(string $path, string $source, array &$violations): void
     {
@@ -266,7 +266,7 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanPrimitiveColorUtilities(string $path, string $source, array &$violations): void
     {
@@ -299,9 +299,9 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
+     * @param  array<string, mixed>  $config
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanForbiddenFolders(array $config, array &$stats, array &$violations): void
     {
@@ -344,9 +344,9 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
+     * @param  array<string, mixed>  $config
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanStories(array $config, array &$stats, array &$violations): void
     {
@@ -376,9 +376,9 @@ final class Auditor
     }
 
     /**
-     * @param callable(string): bool $predicate
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
+     * @param  callable(string): bool  $predicate
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanStoryScope(string $rule, string $root, callable $predicate, array &$stats, array &$violations): void
     {
@@ -412,9 +412,9 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
+     * @param  array<string, mixed>  $config
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      */
     private function scanGeneratedTypeImports(array $config, array &$stats, array &$violations): void
     {
@@ -452,8 +452,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return list<string>
      */
     private function frontendRoots(array $config): array
@@ -474,16 +473,14 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, true>
      */
     private function styleIgnoredFiles(array $config): array
     {
-        $rules = $config['audit']['rules'] ?? [];
-        $ruleConfig = is_array($rules) && isset($rules['no_raw_palette_or_arbitrary_values']) && is_array($rules['no_raw_palette_or_arbitrary_values'])
-            ? $rules['no_raw_palette_or_arbitrary_values']
-            : [];
+        $audit = ArrayData::stringMapAt($config, ['audit']);
+        $rules = ArrayData::stringMap($audit['rules'] ?? null);
+        $ruleConfig = ArrayData::stringMap($rules['no_raw_palette_or_arbitrary_values'] ?? null);
 
         $files = $this->stringList($ruleConfig['ignore_files'] ?? [], [
             'resources/css/iak/tokens.css',
@@ -500,9 +497,8 @@ final class Auditor
     }
 
     /**
-     * @param list<string> $roots
-     * @param null|callable(string): bool $predicate
-     *
+     * @param  list<string>  $roots
+     * @param  null|callable(string): bool  $predicate
      * @return list<array{path: string, absolute: string}>
      */
     private function collectFiles(array $roots, ?callable $predicate = null): array
@@ -555,7 +551,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function isGeneratedPath(string $path, array $config): bool
     {
@@ -662,7 +658,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function hasGeneratedContractImport(string $contents, string $filePath, array $config): bool
     {
@@ -678,8 +674,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return list<string>
      */
     private function generatedImportSpecifiers(string $filePath, array $config): array
@@ -706,7 +701,7 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function generatedTypeAlias(array $config): string
     {
@@ -740,7 +735,8 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
+     * @param  list<array<string, mixed>>  $violations
+     * @param  array<string, mixed>  $suggestion
      */
     private function addViolation(
         array &$violations,
@@ -805,8 +801,7 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
-     *
+     * @param  list<array<string, mixed>>  $violations
      * @return list<array<string, mixed>>
      */
     private function sortAndIdentifyViolations(array $violations): array
@@ -833,9 +828,8 @@ final class Auditor
     }
 
     /**
-     * @param array<string, array{filesScanned: int}> $stats
-     * @param list<array<string, mixed>> $violations
-     *
+     * @param  array<string, array{filesScanned: int}>  $stats
+     * @param  list<array<string, mixed>>  $violations
      * @return list<array<string, mixed>>
      */
     private function buildChecks(array $stats, array $violations): array
@@ -843,7 +837,7 @@ final class Auditor
         $counts = [];
 
         foreach ($violations as $violation) {
-            $rule = (string) $violation['rule'];
+            $rule = is_string($violation['rule'] ?? null) ? $violation['rule'] : '';
             $counts[$rule] = ($counts[$rule] ?? 0) + 1;
         }
 
@@ -868,9 +862,8 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $checks
-     * @param list<array<string, mixed>> $violations
-     *
+     * @param  list<array<string, mixed>>  $checks
+     * @param  list<array<string, mixed>>  $violations
      * @return array<string, int>
      */
     private function buildTotals(array $checks, array $violations): array
@@ -892,15 +885,14 @@ final class Auditor
     }
 
     /**
-     * @param list<array<string, mixed>> $violations
-     *
+     * @param  list<array<string, mixed>>  $violations
      * @return list<array<string, mixed>>
      */
     private function buildNextActions(array $violations): array
     {
         return array_map(static fn (array $violation): array => [
             'type' => 'fix',
-            'summary' => $violation['suggestion']['summary'],
+            'summary' => ArrayData::stringAt(ArrayData::stringMap($violation['suggestion'] ?? null), ['summary'], 'Fix the audit violation.'),
             'rule' => $violation['rule'],
             'file' => $violation['file'],
             'line' => $violation['line'],
@@ -908,17 +900,16 @@ final class Auditor
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function pathsConfig(array $config): array
     {
-        return isset($config['paths']) && is_array($config['paths']) ? $config['paths'] : [];
+        return ArrayData::stringMap($config['paths'] ?? null);
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function configuredPath(array $config, string $key, string $default): string
     {
@@ -930,9 +921,7 @@ final class Auditor
     }
 
     /**
-     * @param mixed $value
-     * @param list<string> $default
-     *
+     * @param  list<string>  $default
      * @return list<string>
      */
     private function stringList(mixed $value, array $default): array
@@ -957,9 +946,7 @@ final class Auditor
     {
         $contents = preg_replace_callback('/\/\*.*?\*\//s', fn (array $match): string => $this->blankPreservingLines($match[0]), $contents) ?? $contents;
 
-        return preg_replace_callback('/(^|[^:])\/\/[^\r\n]*/m', function (array $match): string {
-            return $match[1].str_repeat(' ', strlen($match[0]) - strlen($match[1]));
-        }, $contents) ?? $contents;
+        return preg_replace_callback('/(^|[^:])\/\/[^\r\n]*/m', fn (array $match): string => $match[1].str_repeat(' ', strlen((string) $match[0]) - strlen((string) $match[1])), $contents) ?? $contents;
     }
 
     private function blankPreservingLines(string $text): string

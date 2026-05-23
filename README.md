@@ -56,6 +56,38 @@ The original Node CLI prototype remains in `src/iak.mjs` and `bin/iak.mjs` as a
 reference during the port. The product surface is now the Laravel package and
 Artisan commands.
 
+## Package Architecture
+
+The flat-package refactor targets Laravel 12 and 13 only. Implementation code
+should move toward these package roles:
+
+- `src/Actions/*`: one responsibility, constructor-injected dependencies, and
+  exactly one public workflow method: `handle()`. Actions should not use
+  private helper methods; extract smaller actions or support/data classes
+  instead.
+- `src/Data/*`: JSON schema output objects implementing `JsonSerializable`.
+- `src/Enum/*`: fixed vocabularies; do not duplicate private string const
+  lists.
+- `src/Console/*`: thin input/output only.
+- `src/Support/*`: small reusable helpers and mechanical adapters only.
+
+Every production class needs a mirrored unit test file under `tests/Unit`, and
+the package coverage target is exactly 100.0%. Pest tests must not define global
+helper functions.
+
+Refactor readiness requires PHPStan at max level and Rector in dry-run mode,
+alongside the focused package tests.
+
+## Agent-Optimized Output
+
+The package installs Laravel PAO as a dev dependency so AI agents receive compact
+JSON output from Pest, PHPStan, Rector, and supported Artisan commands. PAO
+activates only when `laravel/agent-detector` detects an agent environment, so
+normal human terminal output is unchanged.
+
+PAO requires PHP 8.3+ in the development toolchain. Runtime package constraints
+remain separate from the dev-only output tooling.
+
 ## Laravel Boost
 
 IAK ships package-provided Boost resources:

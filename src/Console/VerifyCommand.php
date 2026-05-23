@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use InertiaAgentKit\Audit\Auditor;
 use InertiaAgentKit\Feedback\FeedbackException;
 use InertiaAgentKit\Feedback\FeedbackStore;
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\Files;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
@@ -99,16 +100,20 @@ final class VerifyCommand extends Command
             $audit = $this->auditEvidence($paths, $files, $runId, $config);
             $feedback = $this->feedbackEvidence($paths, $files, $runId, $config, $this->feedbackTarget());
             $screenshots = $this->placeholderScreenshots($runId, $paths, $config);
-            $this->tryWriteJson($files, $screenshots['artifact']['path'], $screenshots['metadata']);
+            $this->tryWriteJson(
+                $files,
+                ArrayData::stringAt($screenshots, ['artifact', 'path'], $this->runArtifactPath($paths, $runId, ['screenshots', 'metadata.json'], $config)),
+                $screenshots['metadata'],
+            );
 
             [$status, $exitCode] = $this->statusAndExitCode($audit, $feedback);
             $errors = [
-                ...$audit['errors'],
-                ...$feedback['errors'],
+                ...ArrayData::stringMapList($audit['errors'] ?? null),
+                ...ArrayData::stringMapList($feedback['errors'] ?? null),
             ];
             $nextActions = [
-                ...$audit['nextActions'],
-                ...$feedback['nextActions'],
+                ...ArrayData::stringMapList($audit['nextActions'] ?? null),
+                ...ArrayData::stringMapList($feedback['nextActions'] ?? null),
             ];
             $payload = $this->payload(
                 command: $command,
@@ -142,6 +147,10 @@ final class VerifyCommand extends Command
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $context
+     */
     private function blockedFromException(
         string $command,
         ProjectPaths $paths,
@@ -179,8 +188,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function auditEvidence(ProjectPaths $paths, Files $files, string $runId, array $config): array
@@ -195,8 +203,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function runAuditEvidence(ProjectPaths $paths, Files $files, string $runId, array $config): array
@@ -219,8 +226,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function suppliedAuditEvidence(ProjectPaths $paths, string $path, array $config): array
@@ -230,7 +236,7 @@ final class VerifyCommand extends Command
         $artifact = [
             'kind' => 'json',
             'path' => $normalized,
-            'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
+            'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
         ];
 
         if ($normalized === null || ! str_starts_with($normalized, '.iak/runs/')) {
@@ -255,6 +261,7 @@ final class VerifyCommand extends Command
             return $this->blockedAuditEvidence($artifact, 'audit.schema_invalid', "Audit artifact [{$normalized}] must contain a JSON object.", $startedAt);
         }
 
+        $decoded = ArrayData::stringMap($decoded);
         $schemaErrors = $this->auditSchemaErrors($decoded, $config);
 
         if ($schemaErrors !== []) {
@@ -263,7 +270,7 @@ final class VerifyCommand extends Command
             ]);
         }
 
-        $referencedPath = (string) ($decoded['artifacts']['audit']['path'] ?? '');
+        $referencedPath = ArrayData::stringAt($decoded, ['artifacts', 'audit', 'path'], '');
         $referencedPath = $this->normalizeProjectRelativePath($referencedPath);
 
         if ($referencedPath === null || ! str_starts_with($referencedPath, '.iak/runs/')) {
@@ -274,7 +281,7 @@ final class VerifyCommand extends Command
             return $this->blockedAuditEvidence($artifact, 'audit.stale_artifact', "Audit artifact reference [{$referencedPath}] is missing.", $startedAt);
         }
 
-        $configHash = (string) ($decoded['meta']['configHash'] ?? '');
+        $configHash = ArrayData::stringAt($decoded, ['meta', 'configHash'], '');
 
         if ($configHash !== $this->configHash($config)) {
             return $this->blockedAuditEvidence($artifact, 'audit.stale_artifact', 'Audit artifact was created with a different config hash.', $startedAt, [
@@ -294,9 +301,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $artifact
-     * @param array<string, mixed> $context
-     *
+     * @param  array<string, mixed>  $artifact
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function blockedAuditEvidence(array $artifact, string $code, string $message, float $startedAt, array $context = []): array
@@ -325,35 +331,34 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param list<array<string, mixed>> $errors
-     *
+     * @param  array<string, mixed>  $payload
+     * @param  list<array<string, mixed>>  $errors
      * @return array<string, mixed>
      */
     private function auditEvidenceFromPayload(array $payload, string $artifactPath, string $source, ?string $command, int $durationMs, array $errors): array
     {
         $violations = isset($payload['violations']) && is_array($payload['violations'])
             ? count($payload['violations'])
-            : (int) ($payload['totals']['errors'] ?? 0);
+            : ArrayData::intAt($payload, ['totals', 'errors'], 0);
 
-        $totals = isset($payload['totals']) && is_array($payload['totals']) ? $payload['totals'] : [];
+        $totals = ArrayData::stringMap($payload['totals'] ?? null);
 
         return [
             'source' => $source,
-            'status' => (string) ($payload['status'] ?? 'blocked'),
+            'status' => ArrayData::stringAt($payload, ['status'], 'blocked'),
             'runId' => isset($payload['runId']) && is_string($payload['runId']) ? $payload['runId'] : null,
-            'configHash' => isset($payload['meta']['configHash']) && is_string($payload['meta']['configHash']) ? $payload['meta']['configHash'] : null,
+            'configHash' => ArrayData::stringAt($payload, ['meta', 'configHash'], '') ?: null,
             'violations' => $violations,
             'artifact' => [
                 'kind' => 'json',
                 'path' => $artifactPath,
-                'schema' => (string) ($payload['schema'] ?? 'iak.audit.v1'),
+                'schema' => ArrayData::stringAt($payload, ['schema'], 'iak.audit.v1'),
             ],
             'command' => $command,
             'durationMs' => $durationMs,
             'totals' => [
-                'errors' => (int) ($totals['errors'] ?? 0),
-                'warnings' => (int) ($totals['warnings'] ?? 0),
+                'errors' => ArrayData::intAt($totals, ['errors'], 0),
+                'warnings' => ArrayData::intAt($totals, ['warnings'], 0),
                 'violations' => $violations,
             ],
             'payload' => $payload,
@@ -365,9 +370,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $config
      * @return list<array{field: string, message: string}>
      */
     private function auditSchemaErrors(array $payload, array $config): array
@@ -375,8 +379,8 @@ final class VerifyCommand extends Command
         $errors = [];
 
         foreach ([
-            'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
-            'event' => (string) ($config['json_schemas']['audit_completed'] ?? 'iak.audit.completed'),
+            'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
+            'event' => $this->configString($config, ['json_schemas', 'audit_completed'], 'iak.audit.completed'),
             'version' => 1,
         ] as $field => $expected) {
             if (($payload[$field] ?? null) !== $expected) {
@@ -404,11 +408,11 @@ final class VerifyCommand extends Command
             }
         }
 
-        if (! isset($payload['artifacts']['audit']['path']) || ! is_string($payload['artifacts']['audit']['path']) || $payload['artifacts']['audit']['path'] === '') {
+        if (ArrayData::stringAt($payload, ['artifacts', 'audit', 'path'], '') === '') {
             $errors[] = ['field' => 'artifacts.audit.path', 'message' => 'Audit artifact path is required.'];
         }
 
-        if (! isset($payload['meta']['configHash']) || ! is_string($payload['meta']['configHash']) || $payload['meta']['configHash'] === '') {
+        if (ArrayData::stringAt($payload, ['meta', 'configHash'], '') === '') {
             $errors[] = ['field' => 'meta.configHash', 'message' => 'Audit config hash is required.'];
         }
 
@@ -416,7 +420,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      * @param array{
      *     status: string,
      *     totals: array<string, int>,
@@ -424,14 +428,13 @@ final class VerifyCommand extends Command
      *     violations: list<array<string, mixed>>,
      *     nextActions: list<array<string, mixed>>
      * } $result
-     *
      * @return array<string, mixed>
      */
     private function auditPayload(string $runId, string $artifactPath, array $config, array $result): array
     {
         return [
-            'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
-            'event' => (string) ($config['json_schemas']['audit_completed'] ?? 'iak.audit.completed'),
+            'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
+            'event' => $this->configString($config, ['json_schemas', 'audit_completed'], 'iak.audit.completed'),
             'version' => 1,
             'command' => 'iak:audit',
             'runId' => $runId,
@@ -446,7 +449,7 @@ final class VerifyCommand extends Command
                 'audit' => [
                     'kind' => 'json',
                     'path' => $artifactPath,
-                    'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
+                    'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
                 ],
             ],
             'nextActions' => $result['nextActions'],
@@ -456,16 +459,20 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function feedbackEvidence(ProjectPaths $paths, Files $files, string $runId, array $config, ?string $targetId): array
     {
-        $store = new FeedbackStore($paths, (string) ($config['feedback']['path'] ?? '.iak/feedback'));
+        $store = new FeedbackStore($paths, $this->configString($config, ['feedback', 'path'], '.iak/feedback'));
         $records = $store->all();
 
-        usort($records, static fn (array $left, array $right): int => strcmp((string) ($left['id'] ?? ''), (string) ($right['id'] ?? '')));
+        usort($records, static function (array $left, array $right): int {
+            $leftId = is_string($left['id'] ?? null) ? $left['id'] : '';
+            $rightId = is_string($right['id'] ?? null) ? $right['id'] : '';
+
+            return strcmp($leftId, $rightId);
+        });
 
         if ($targetId !== null && $this->findFeedbackRecord($records, $targetId) === null) {
             $artifactPaths = $this->feedbackArtifactPaths($paths, $runId, $config);
@@ -547,7 +554,7 @@ final class VerifyCommand extends Command
 
         if ($blocking !== []) {
             $errors[] = $this->errorPayload('feedback.unresolved', 'Related feedback is unresolved or has invalid resolution evidence.', [
-                'ids' => array_values(array_filter(array_column($blocking, 'id'), 'is_string')),
+                'ids' => array_values(array_filter(array_column($blocking, 'id'), is_string(...))),
             ]);
         }
 
@@ -557,7 +564,7 @@ final class VerifyCommand extends Command
             'unresolved' => count($blocking),
             'invalidResolved' => count($invalidResolved),
             'target' => $targetId,
-            'ids' => array_values(array_filter(array_column($blocking, 'id'), 'is_string')),
+            'ids' => array_values(array_filter(array_column($blocking, 'id'), is_string(...))),
             'excludedIds' => $targetId === null ? [] : [$targetId],
             'counts' => [
                 'total' => count($records),
@@ -573,7 +580,7 @@ final class VerifyCommand extends Command
             ],
             'nextActions' => array_map(static fn (array $item): array => [
                 'type' => 'resolve_feedback',
-                'summary' => (string) ($item['message'] ?? 'Resolve related feedback.'),
+                'summary' => ArrayData::stringAt($item, ['message'], 'Resolve related feedback.'),
                 'feedbackId' => $item['id'] ?? null,
             ], $blocking),
             'errors' => $errors,
@@ -581,7 +588,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $record
+     * @param  array<string, mixed>  $record
      */
     private function feedbackId(array $record): ?string
     {
@@ -591,7 +598,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param list<array<string, mixed>> $records
+     * @param  list<array<string, mixed>>  $records
+     * @return array<string, mixed>|null
      */
     private function findFeedbackRecord(array $records, string $id): ?array
     {
@@ -605,8 +613,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $record
-     * @param array<string, bool> $knownIds
+     * @param  array<string, mixed>  $record
+     * @param  array<string, bool>  $knownIds
      */
     private function hasValidResolution(array $record, array $knownIds): bool
     {
@@ -640,8 +648,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $record
-     *
+     * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
     private function feedbackSummaryItem(array $record, string $status): array
@@ -657,7 +664,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param list<array<string, mixed>> $records
+     * @param  list<array<string, mixed>>  $records
      */
     private function countFeedbackStatus(array $records, string $status): int
     {
@@ -665,8 +672,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array{related: string, unresolved: string}
      */
     private function feedbackArtifactPaths(ProjectPaths $paths, string $runId, array $config): array
@@ -678,8 +684,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function emptyAuditEvidence(string $runId, ProjectPaths $paths, array $config): array
@@ -693,7 +698,7 @@ final class VerifyCommand extends Command
             'artifact' => [
                 'kind' => 'json',
                 'path' => $this->runArtifactPath($paths, $runId, ['audit.json'], $config),
-                'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
+                'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
             ],
             'command' => null,
             'durationMs' => 0,
@@ -709,8 +714,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function emptyFeedbackEvidence(string $runId, ProjectPaths $paths, array $config, ?string $targetId): array
@@ -743,8 +747,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array{artifact: array<string, mixed>, metadata: array<string, mixed>, browser: array<string, mixed>, storybook: array<string, mixed>}
      */
     private function placeholderScreenshots(string $runId, ProjectPaths $paths, array $config): array
@@ -804,13 +807,12 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, mixed> $audit
-     * @param array<string, mixed> $feedback
-     * @param array{artifact: array<string, mixed>, metadata: array<string, mixed>, browser: array<string, mixed>, storybook: array<string, mixed>} $screenshots
-     * @param list<array<string, mixed>> $nextActions
-     * @param list<array<string, mixed>> $errors
-     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $audit
+     * @param  array<string, mixed>  $feedback
+     * @param  array{artifact: array<string, mixed>, metadata: array<string, mixed>, browser: array<string, mixed>, storybook: array<string, mixed>}  $screenshots
+     * @param  list<array<string, mixed>>  $nextActions
+     * @param  list<array<string, mixed>>  $errors
      * @return array<string, mixed>
      */
     private function payload(
@@ -831,7 +833,7 @@ final class VerifyCommand extends Command
         int $exitCode,
     ): array {
         return [
-            'schema' => (string) ($config['json_schemas']['verify'] ?? 'iak.verify.v1'),
+            'schema' => $this->configString($config, ['json_schemas', 'verify'], 'iak.verify.v1'),
             'event' => 'iak.verify.completed',
             'version' => 1,
             'command' => $command,
@@ -863,7 +865,7 @@ final class VerifyCommand extends Command
                     'unresolved' => $feedback['unresolved'],
                     'invalidResolved' => $feedback['invalidResolved'],
                     'target' => $feedback['target'],
-                    'artifact' => $feedback['artifacts']['unresolved'],
+                    'artifact' => ArrayData::stringMapAt($feedback, ['artifacts', 'unresolved']),
                 ],
                 [
                     'id' => 'browser',
@@ -894,8 +896,8 @@ final class VerifyCommand extends Command
                     'ids' => $feedback['ids'],
                     'excludedIds' => $feedback['excludedIds'],
                     'counts' => $feedback['counts'],
-                    'artifact' => $feedback['artifacts']['unresolved'],
-                    'relatedArtifact' => $feedback['artifacts']['related'],
+                    'artifact' => ArrayData::stringMapAt($feedback, ['artifacts', 'unresolved']),
+                    'relatedArtifact' => ArrayData::stringMapAt($feedback, ['artifacts', 'related']),
                 ],
                 'browser' => $screenshots['browser'],
                 'storybook' => $screenshots['storybook'],
@@ -914,11 +916,11 @@ final class VerifyCommand extends Command
                 'verify' => [
                     'kind' => 'json',
                     'path' => $artifactPath,
-                    'schema' => (string) ($config['json_schemas']['verify'] ?? 'iak.verify.v1'),
+                    'schema' => $this->configString($config, ['json_schemas', 'verify'], 'iak.verify.v1'),
                 ],
                 'audit' => $audit['artifact'],
-                'feedback' => $feedback['artifacts']['unresolved'],
-                'feedbackRelated' => $feedback['artifacts']['related'],
+                'feedback' => ArrayData::stringMapAt($feedback, ['artifacts', 'unresolved']),
+                'feedbackRelated' => ArrayData::stringMapAt($feedback, ['artifacts', 'related']),
                 'screenshots' => $screenshots['artifact'],
             ],
             'nextActions' => $nextActions,
@@ -935,9 +937,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $audit
-     * @param array<string, mixed> $feedback
-     *
+     * @param  array<string, mixed>  $audit
+     * @param  array<string, mixed>  $feedback
      * @return array{0: string, 1: int}
      */
     private function statusAndExitCode(array $audit, array $feedback): array
@@ -954,8 +955,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $audit
-     * @param array<string, mixed> $feedback
+     * @param  array<string, mixed>  $audit
+     * @param  array<string, mixed>  $feedback
      */
     private function summary(string $status, array $audit, array $feedback): string
     {
@@ -970,11 +971,11 @@ final class VerifyCommand extends Command
         $reasons = [];
 
         if ($audit['status'] !== 'passed') {
-            $reasons[] = sprintf('audit %s', $audit['status']);
+            $reasons[] = sprintf('audit %s', ArrayData::stringAt($audit, ['status'], 'blocked'));
         }
 
         if ($feedback['status'] !== 'passed') {
-            $reasons[] = sprintf('%d feedback record(s) blocking', $feedback['unresolved']);
+            $reasons[] = sprintf('%d feedback record(s) blocking', ArrayData::intAt($feedback, ['unresolved'], 0));
         }
 
         return 'Verify failed: '.implode('; ', $reasons).'.';
@@ -1011,7 +1012,7 @@ final class VerifyCommand extends Command
     {
         $config = config('inertia-agent-kit');
 
-        return is_array($config) ? $config : [];
+        return ArrayData::stringMap($config);
     }
 
     /**
@@ -1038,12 +1039,11 @@ final class VerifyCommand extends Command
             throw new RuntimeException("Config file [{$configPath}] must return an array.");
         }
 
-        return array_replace_recursive($baseConfig, $loaded);
+        return ArrayData::stringMap(array_replace_recursive($baseConfig, $loaded));
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return list<array<string, mixed>>
      */
     private function validateConfig(array $config): array
@@ -1084,8 +1084,8 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param list<string> $segments
-     * @param array<string, mixed> $config
+     * @param  list<string>  $segments
+     * @param  array<string, mixed>  $config
      */
     private function runArtifactPath(ProjectPaths $paths, string $runId, array $segments, array $config): string
     {
@@ -1123,7 +1123,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $value
+     * @param  array<string, mixed>  $value
      */
     private function tryWriteJson(Files $files, string $path, array $value): void
     {
@@ -1131,8 +1131,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function meta(array $config): array
@@ -1150,11 +1149,20 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function configHash(array $config): string
     {
         return 'sha256:'.hash('sha256', json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $path
+     */
+    private function configString(array $config, array $path, string $default): string
+    {
+        return ArrayData::stringAt($config, $path, $default);
     }
 
     private function durationMs(float $startedAt): int
@@ -1199,8 +1207,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $context
-     *
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function errorPayload(string $code, string $message, array $context = []): array
@@ -1222,7 +1229,7 @@ final class VerifyCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function emitPayload(array $payload, int $status): int
     {
@@ -1238,7 +1245,7 @@ final class VerifyCommand extends Command
             return $status;
         }
 
-        $this->line((string) ($payload['summary'] ?? 'Verify completed.'));
+        $this->line(ArrayData::stringAt($payload, ['summary'], 'Verify completed.'));
 
         return $status;
     }

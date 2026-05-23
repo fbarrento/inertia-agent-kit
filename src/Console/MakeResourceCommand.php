@@ -6,8 +6,9 @@ namespace InertiaAgentKit\Console;
 
 use Illuminate\Console\Command;
 use InertiaAgentKit\Console\Concerns\EmitsJson;
-use InertiaAgentKit\Scaffolding\ResourceScaffoldOptions;
 use InertiaAgentKit\Scaffolding\ResourceScaffolder;
+use InertiaAgentKit\Scaffolding\ResourceScaffoldOptions;
+use InertiaAgentKit\Support\ArrayData;
 
 final class MakeResourceCommand extends Command
 {
@@ -30,12 +31,12 @@ final class MakeResourceCommand extends Command
 
     public function handle(): int
     {
-        $resource = (string) ($this->argument('resource') ?? '');
+        $resource = $this->nullableArgument('resource') ?? '';
         $command = 'php artisan '.($this->getName() ?? 'iak:make-resource').($resource !== '' ? " {$resource}" : '');
 
         $plan = (new ResourceScaffolder($this->laravel))->scaffold(new ResourceScaffoldOptions(
             resource: $resource,
-            adapter: (string) $this->option('adapter'),
+            adapter: $this->nullableOption('adapter') ?? 'react',
             dryRun: (bool) $this->option('dry-run'),
             force: (bool) $this->option('force'),
             singular: $this->nullableOption('singular'),
@@ -54,16 +55,17 @@ final class MakeResourceCommand extends Command
         }
 
         if ($plan['status'] === 'failed') {
-            $firstError = $plan['errors'][0]['message'] ?? 'Resource scaffold failed.';
+            $errors = is_array($plan['errors'] ?? null) ? array_values($plan['errors']) : [];
+            $firstError = ArrayData::stringAt(ArrayData::stringMap($errors[0] ?? null), ['message'], 'Resource scaffold failed.');
 
-            $this->error((string) $firstError);
+            $this->error($firstError);
 
             return $status;
         }
 
         $verb = $plan['mode'] === 'dry-run' ? 'Planned' : 'Scaffolded';
 
-        $this->line("{$verb} {$plan['resource']['name']} resource.");
+        $this->line("{$verb} ".ArrayData::stringAt($plan, ['resource', 'name'], $resource).' resource.');
 
         return $status;
     }
@@ -77,6 +79,19 @@ final class MakeResourceCommand extends Command
         }
 
         $value = trim($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function nullableArgument(string $name): ?string
+    {
+        $value = $this->argument($name);
+
+        if (! is_scalar($value) || is_bool($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
 
         return $value === '' ? null : $value;
     }

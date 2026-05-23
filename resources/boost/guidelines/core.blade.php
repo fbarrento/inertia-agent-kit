@@ -25,6 +25,11 @@ IAK Artisan surface: `iak:init`, `iak:make-resource`, `iak:audit`,
 artifact paths; do not paste large logs, screenshots, DOM dumps, generated
 types, schemas, or framework documentation into chat.
 
+When editing IAK itself, keep Laravel 12/13 flat package roles: Actions expose
+one public `handle()`, Data implements `JsonSerializable`, Enum owns fixed
+vocabularies, Console stays thin, and Support stays mechanical. PHPStan at max
+level and Rector dry-run gate refactors.
+
 For any non-trivial Inertia UI change, feedback resolution, audit failure,
 verification failure, design-system/story evidence change, or final handoff,
 consult the `inertia-agent-kit` skill.

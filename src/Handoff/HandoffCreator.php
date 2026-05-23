@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace InertiaAgentKit\Handoff;
 
 use Illuminate\Support\Str;
+use InertiaAgentKit\Support\ArrayData;
 use Throwable;
 
-final class HandoffCreator
+final readonly class HandoffCreator
 {
-    private readonly ChangedFileParser $changedFileParser;
+    private ChangedFileParser $changedFileParser;
 
     public function __construct(?ChangedFileParser $changedFileParser = null)
     {
-        $this->changedFileParser = $changedFileParser ?? new ChangedFileParser();
+        $this->changedFileParser = $changedFileParser ?? new ChangedFileParser;
     }
 
     /**
-     * @param array<string, mixed> $input
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     public function create(array $input, array $config = []): array
@@ -88,9 +88,8 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, list<array<string, mixed>>> $left
-     * @param array<string, list<array<string, mixed>>> $right
-     *
+     * @param  array<string, list<array<string, mixed>>>  $left
+     * @param  array<string, list<array<string, mixed>>>  $right
      * @return array<string, list<array<string, mixed>>>
      */
     private function mergeChangedFiles(array $left, array $right): array
@@ -124,6 +123,7 @@ final class HandoffCreator
                     continue;
                 }
 
+                $entry = ArrayData::stringMap($entry);
                 $path = $this->stringInput($entry, ['path']);
                 $action = $this->stringInput($entry, ['action']);
 
@@ -176,8 +176,7 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $input
-     *
+     * @param  array<string, mixed>  $input
      * @return list<array<string, mixed>>
      */
     private function nextActions(array $input): array
@@ -190,7 +189,11 @@ final class HandoffCreator
 
             foreach ($items as $item) {
                 if (is_array($item)) {
-                    $actions[] = $item;
+                    $item = ArrayData::stringMap($item);
+
+                    if ($item !== []) {
+                        $actions[] = $item;
+                    }
 
                     continue;
                 }
@@ -209,7 +212,7 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<mixed> $value
+     * @param  array<mixed>  $value
      */
     private function isAssociativeNextAction(array $value): bool
     {
@@ -229,8 +232,8 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $input
-     * @param list<string> $keys
+     * @param  array<string, mixed>  $input
+     * @param  list<string>  $keys
      */
     private function stringInput(array $input, array $keys): ?string
     {
@@ -256,9 +259,8 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $input
-     * @param list<string> $keys
-     *
+     * @param  array<string, mixed>  $input
+     * @param  list<string>  $keys
      * @return list<string>
      */
     private function stringListInput(array $input, array $keys): array
@@ -301,8 +303,8 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $input
-     * @param list<string> $keys
+     * @param  array<string, mixed>  $input
+     * @param  list<string>  $keys
      */
     private function integerInput(array $input, array $keys): ?int
     {
@@ -326,8 +328,8 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param list<string> $keys
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $keys
      */
     private function configString(array $config, array $keys, string $default): string
     {
@@ -349,7 +351,7 @@ final class HandoffCreator
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function handoffArtifactPath(string $runId, array $config): string
     {
@@ -366,7 +368,7 @@ final class HandoffCreator
     private function generateRunId(): string
     {
         try {
-            if (class_exists(Str::class) && method_exists(Str::class, 'ulid')) {
+            if (class_exists(Str::class)) {
                 return 'run_'.strtolower((string) Str::ulid());
             }
         } catch (Throwable) {

@@ -7,6 +7,7 @@ namespace InertiaAgentKit\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use InertiaAgentKit\Audit\Auditor;
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\Files;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
@@ -29,16 +30,17 @@ final class AuditCommand extends Command
         $runId = $this->resolveRunId();
 
         if (! $this->isValidRunId($runId)) {
+            $artifactPath = '.iak/runs/run_invalid/audit.json';
             $payload = $this->blockedPayload(
                 $command,
                 'run_invalid',
-                '.iak/runs/run_invalid/audit.json',
+                $artifactPath,
                 'iak.usage.invalid_run_id',
                 'Run id may contain only letters, numbers, dots, underscores, and dashes.',
                 ['runId' => $runId]
             );
 
-            $this->writeArtifact($payload, $payload['artifacts']['audit']['path']);
+            $this->writeArtifact($payload, $artifactPath);
 
             return $this->emitPayload($payload, self::INVALID);
         }
@@ -122,7 +124,7 @@ final class AuditCommand extends Command
     {
         $config = config('inertia-agent-kit');
 
-        return is_array($config) ? $config : [];
+        return ArrayData::stringMap($config);
     }
 
     /**
@@ -149,12 +151,11 @@ final class AuditCommand extends Command
             throw new \RuntimeException("Config file [{$configPath}] must return an array.");
         }
 
-        return array_replace_recursive($baseConfig, $loaded);
+        return ArrayData::stringMap(array_replace_recursive($baseConfig, $loaded));
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return list<array{code: string, message: string}>
      */
     private function validateConfig(array $config): array
@@ -195,7 +196,7 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function artifactPath(ProjectPaths $paths, string $runId, array $config): string
     {
@@ -208,7 +209,7 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      * @param array{
      *     status: string,
      *     totals: array<string, int>,
@@ -216,15 +217,14 @@ final class AuditCommand extends Command
      *     violations: list<array<string, mixed>>,
      *     nextActions: list<array<string, mixed>>
      * } $result
-     * @param list<array<string, mixed>> $errors
-     *
+     * @param  list<array<string, mixed>>  $errors
      * @return array<string, mixed>
      */
     private function completedPayload(string $command, string $runId, string $artifactPath, array $config, array $result, array $errors): array
     {
         return [
-            'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
-            'event' => (string) ($config['json_schemas']['audit_completed'] ?? 'iak.audit.completed'),
+            'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
+            'event' => $this->configString($config, ['json_schemas', 'audit_completed'], 'iak.audit.completed'),
             'version' => 1,
             'command' => $command,
             'runId' => $runId,
@@ -237,7 +237,7 @@ final class AuditCommand extends Command
                 'audit' => [
                     'kind' => 'json',
                     'path' => $artifactPath,
-                    'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
+                    'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
                 ],
             ],
             'nextActions' => $result['nextActions'],
@@ -247,9 +247,8 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $context
-     * @param array<string, mixed>|null $config
-     *
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>|null  $config
      * @return array<string, mixed>
      */
     private function blockedPayload(
@@ -269,8 +268,8 @@ final class AuditCommand extends Command
         ]];
 
         return [
-            'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
-            'event' => (string) ($config['json_schemas']['audit_completed'] ?? 'iak.audit.completed'),
+            'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
+            'event' => $this->configString($config, ['json_schemas', 'audit_completed'], 'iak.audit.completed'),
             'version' => 1,
             'command' => $command,
             'runId' => $runId,
@@ -291,7 +290,7 @@ final class AuditCommand extends Command
                 'audit' => [
                     'kind' => 'json',
                     'path' => $artifactPath,
-                    'schema' => (string) ($config['json_schemas']['audit'] ?? 'iak.audit.v1'),
+                    'schema' => $this->configString($config, ['json_schemas', 'audit'], 'iak.audit.v1'),
                 ],
             ],
             'nextActions' => [],
@@ -301,8 +300,7 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $config
-     *
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function meta(array $config): array
@@ -335,7 +333,7 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function writeArtifact(array $payload, string $artifactPath): void
     {
@@ -343,7 +341,7 @@ final class AuditCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function emitPayload(array $payload, int $exitCode): int
     {
@@ -359,8 +357,8 @@ final class AuditCommand extends Command
             return $exitCode;
         }
 
-        $this->line((string) $payload['summary']);
-        $this->line('Artifact: '.$payload['artifacts']['audit']['path']);
+        $this->line(ArrayData::stringAt($payload, ['summary'], 'Audit completed.'));
+        $this->line('Artifact: '.ArrayData::stringAt($payload, ['artifacts', 'audit', 'path'], ''));
 
         return $exitCode;
     }
@@ -368,5 +366,14 @@ final class AuditCommand extends Command
     private function shouldEmitJson(): bool
     {
         return getenv('IAK_AGENT') === '1' || (bool) $this->option('json');
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $path
+     */
+    private function configString(array $config, array $path, string $default): string
+    {
+        return ArrayData::stringAt($config, $path, $default);
     }
 }

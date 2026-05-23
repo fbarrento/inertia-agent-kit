@@ -7,9 +7,8 @@ namespace InertiaAgentKit\Support;
 final class Result
 {
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $meta
-     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     public static function ok(string $schema, array $data = [], array $meta = []): array
@@ -18,8 +17,7 @@ final class Result
     }
 
     /**
-     * @param array<string, mixed> $data
-     *
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     public static function pending(string $schema, string $message, array $data = []): array
@@ -31,8 +29,7 @@ final class Result
     }
 
     /**
-     * @param array<string, mixed> $context
-     *
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     public static function error(string $schema, string $code, string $message, array $context = []): array
@@ -50,9 +47,8 @@ final class Result
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $meta
-     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     private static function shape(string $schema, string $status, array $data, array $meta = []): array
@@ -66,8 +62,7 @@ final class Result
     }
 
     /**
-     * @param array<string, mixed> $meta
-     *
+     * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     private static function meta(array $meta = []): array
