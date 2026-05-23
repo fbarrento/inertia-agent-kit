@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Feedback;
 
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
 
-final class FeedbackEvidenceValidator
+final readonly class FeedbackEvidenceValidator
 {
     /** @var array<int, string> */
     private const ALLOWED_SCHEMAS = [
@@ -17,9 +18,8 @@ final class FeedbackEvidenceValidator
     ];
 
     public function __construct(
-        private readonly ProjectPaths $paths,
-    ) {
-    }
+        private ProjectPaths $paths,
+    ) {}
 
     /**
      * @return array{path: string, absolutePath: string, evidence: array<string, mixed>}
@@ -69,6 +69,8 @@ final class FeedbackEvidenceValidator
                 $relativePath,
             );
         }
+
+        $evidence = ArrayData::stringMap($evidence);
 
         $schema = $evidence['schema'] ?? null;
 

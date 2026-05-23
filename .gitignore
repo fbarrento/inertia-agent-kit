@@ -15,6 +15,7 @@ build/
 coverage/
 .nyc_output/
 .phpunit.cache/
+.phpstan-cache/
 
 # Local environment
 .env

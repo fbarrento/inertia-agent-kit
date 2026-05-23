@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use InertiaAgentKit\Console\FeedbackCommand;
+use Symfony\Component\Console\Input\ArrayInput;
+use Tests\Utils\FeedbackCommandTestHelper;
+use Tests\Utils\ThrowingOutput;
 
 beforeEach(function (): void {
     $basePath = sys_get_temp_dir().'/iak-feedback-command-'.bin2hex(random_bytes(6));
@@ -10,6 +14,7 @@ beforeEach(function (): void {
     mkdir($basePath, 0755, true);
 
     $this->app->setBasePath($basePath);
+    $this->feedback = new FeedbackCommandTestHelper($basePath);
 
     config()->set('inertia-agent-kit.feedback.path', '.iak/feedback');
 });
@@ -19,12 +24,12 @@ afterEach(function (): void {
     $prefix = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'iak-feedback-command-';
 
     if (str_starts_with($basePath, $prefix)) {
-        removeFeedbackFixtureDirectory($basePath);
+        $this->feedback->removeDirectory();
     }
 });
 
-it('returns an empty feedback list when the store does not exist', function (): void {
-    [$exitCode, $payload] = callFeedbackCommand([
+test('returns an empty feedback list when the store does not exist', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
         'action' => 'list',
     ]);
 
@@ -58,8 +63,8 @@ it('returns an empty feedback list when the store does not exist', function (): 
         ]);
 });
 
-it('lists seeded feedback with deterministic filtering and ordering', function (): void {
-    writeFeedbackRecord([
+test('lists seeded feedback with deterministic filtering and ordering', function (): void {
+    $this->feedback->writeRecord([
         'id' => 'fbk_app_old',
         'status' => 'pending',
         'surface' => 'app',
@@ -67,7 +72,7 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
         'createdAt' => '2026-05-22T15:00:00Z',
         'updatedAt' => '2026-05-22T15:00:00Z',
     ]);
-    writeFeedbackRecord([
+    $this->feedback->writeRecord([
         'id' => 'fbk_app_new',
         'status' => 'pending',
         'surface' => 'app',
@@ -75,7 +80,7 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
         'createdAt' => '2026-05-22T16:00:00Z',
         'updatedAt' => '2026-05-22T16:00:00Z',
     ]);
-    writeFeedbackRecord([
+    $this->feedback->writeRecord([
         'id' => 'fbk_app_resolved',
         'status' => 'resolved',
         'surface' => 'app',
@@ -87,7 +92,7 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
             'status' => 'resolved',
         ],
     ]);
-    writeFeedbackRecord([
+    $this->feedback->writeRecord([
         'id' => 'fbk_story_agent',
         'status' => 'pending',
         'surface' => 'storybook',
@@ -96,7 +101,7 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
         'updatedAt' => '2026-05-22T18:00:00Z',
     ]);
 
-    [$allExitCode, $allPayload] = callFeedbackCommand([
+    [$allExitCode, $allPayload] = $this->feedback->call([
         'action' => 'list',
         '--status' => 'all',
         '--surface' => 'app',
@@ -116,7 +121,7 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
             'resolved' => 1,
         ]);
 
-    [$pendingExitCode, $pendingPayload] = callFeedbackCommand([
+    [$pendingExitCode, $pendingPayload] = $this->feedback->call([
         'action' => 'list',
         '--status' => 'pending',
         '--surface' => 'app',
@@ -134,15 +139,15 @@ it('lists seeded feedback with deterministic filtering and ordering', function (
         ]);
 });
 
-it('shows a complete feedback record', function (): void {
-    $record = writeFeedbackRecord([
+test('shows a complete feedback record', function (): void {
+    $record = $this->feedback->writeRecord([
         'id' => 'fbk_show',
         'unknownProducerField' => [
             'kept' => true,
         ],
     ]);
 
-    [$exitCode, $payload] = callFeedbackCommand([
+    [$exitCode, $payload] = $this->feedback->call([
         'action' => 'show',
         'id' => 'fbk_show',
     ]);
@@ -162,8 +167,8 @@ it('shows a complete feedback record', function (): void {
         ->and($payload['record'])->toEqual($record);
 });
 
-it('returns a structured error for a missing feedback record', function (): void {
-    [$exitCode, $payload] = callFeedbackCommand([
+test('returns a structured error for a missing feedback record', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
         'action' => 'show',
         'id' => 'fbk_missing',
     ]);
@@ -176,22 +181,22 @@ it('returns a structured error for a missing feedback record', function (): void
         ->and($payload['error']['line'])->toBeNull();
 });
 
-it('rejects invalid resolve evidence without mutating the record', function (): void {
-    $record = writeFeedbackRecord([
+test('rejects invalid resolve evidence without mutating the record', function (): void {
+    $record = $this->feedback->writeRecord([
         'id' => 'fbk_validate',
         'status' => 'pending',
     ]);
 
-    [$missingOptionExitCode, $missingOptionPayload] = callFeedbackCommand([
+    [$missingOptionExitCode, $missingOptionPayload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_validate',
     ]);
 
     expect($missingOptionExitCode)->toBe(2)
         ->and($missingOptionPayload['error']['code'])->toBe('feedback.evidence_required')
-        ->and(readFeedbackRecord('fbk_validate'))->toEqual($record);
+        ->and($this->feedback->readRecord('fbk_validate'))->toEqual($record);
 
-    [$missingPathExitCode, $missingPathPayload] = callFeedbackCommand([
+    [$missingPathExitCode, $missingPathPayload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_validate',
         '--evidence' => '.iak/runs/missing.json',
@@ -199,11 +204,11 @@ it('rejects invalid resolve evidence without mutating the record', function (): 
 
     expect($missingPathExitCode)->toBe(2)
         ->and($missingPathPayload['error']['code'])->toBe('feedback.evidence_not_found')
-        ->and(readFeedbackRecord('fbk_validate'))->toEqual($record);
+        ->and($this->feedback->readRecord('fbk_validate'))->toEqual($record);
 
-    writeRawFixture('.iak/runs/invalid.json', '{not json');
+    $this->feedback->writeRaw('.iak/runs/invalid.json', '{not json');
 
-    [$invalidJsonExitCode, $invalidJsonPayload] = callFeedbackCommand([
+    [$invalidJsonExitCode, $invalidJsonPayload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_validate',
         '--evidence' => '.iak/runs/invalid.json',
@@ -211,13 +216,13 @@ it('rejects invalid resolve evidence without mutating the record', function (): 
 
     expect($invalidJsonExitCode)->toBe(2)
         ->and($invalidJsonPayload['error']['code'])->toBe('feedback.evidence_invalid_json')
-        ->and(readFeedbackRecord('fbk_validate'))->toEqual($record);
+        ->and($this->feedback->readRecord('fbk_validate'))->toEqual($record);
 
-    writeJsonFixture('.iak/runs/wrong-schema.json', [
+    $this->feedback->writeJson('.iak/runs/wrong-schema.json', [
         'schema' => 'iak.audit.v1',
     ]);
 
-    [$wrongSchemaExitCode, $wrongSchemaPayload] = callFeedbackCommand([
+    [$wrongSchemaExitCode, $wrongSchemaPayload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_validate',
         '--evidence' => '.iak/runs/wrong-schema.json',
@@ -225,11 +230,11 @@ it('rejects invalid resolve evidence without mutating the record', function (): 
 
     expect($wrongSchemaExitCode)->toBe(2)
         ->and($wrongSchemaPayload['error']['code'])->toBe('feedback.evidence_invalid_schema')
-        ->and(readFeedbackRecord('fbk_validate'))->toEqual($record);
+        ->and($this->feedback->readRecord('fbk_validate'))->toEqual($record);
 });
 
-it('resolves pending feedback and preserves existing record fields', function (): void {
-    $record = writeFeedbackRecord([
+test('resolves pending feedback and preserves existing record fields', function (): void {
+    $record = $this->feedback->writeRecord([
         'id' => 'fbk_resolve',
         'status' => 'pending',
         'customRecordField' => [
@@ -257,16 +262,16 @@ it('resolves pending feedback and preserves existing record fields', function ()
         ],
     ];
 
-    writeJsonFixture('.iak/runs/run_01/verify.json', $evidence);
+    $this->feedback->writeJson('.iak/runs/run_01/verify.json', $evidence);
 
-    [$exitCode, $payload] = callFeedbackCommand([
+    [$exitCode, $payload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_resolve',
         '--evidence' => '.iak/runs/run_01/verify.json',
         '--summary' => 'Reused the shared filter bar component.',
     ]);
 
-    $updated = readFeedbackRecord('fbk_resolve');
+    $updated = $this->feedback->readRecord('fbk_resolve');
 
     expect($exitCode)->toBe(0)
         ->and($payload['schema'])->toBe('iak.feedback.resolve.v1')
@@ -287,8 +292,8 @@ it('resolves pending feedback and preserves existing record fields', function ()
         ->and($payload['record'])->toEqual($updated);
 });
 
-it('copies normalized resolution evidence and preserves unknown evidence fields', function (): void {
-    writeFeedbackRecord([
+test('copies normalized resolution evidence and preserves unknown evidence fields', function (): void {
+    $this->feedback->writeRecord([
         'id' => 'fbk_copy',
         'status' => 'in_progress',
     ]);
@@ -302,25 +307,66 @@ it('copies normalized resolution evidence and preserves unknown evidence fields'
         ],
     ];
 
-    writeJsonFixture('.iak/runs/run_02/handoff.json', $evidence);
+    $this->feedback->writeJson('.iak/runs/run_02/handoff.json', $evidence);
 
-    [$exitCode] = callFeedbackCommand([
+    [$exitCode] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_copy',
         '--evidence' => '.iak/runs/run_02/handoff.json',
     ]);
 
     expect($exitCode)->toBe(0)
-        ->and(readJsonFixture('.iak/feedback/fbk_copy/resolution/evidence.json'))->toEqual($evidence);
+        ->and($this->feedback->readJson('.iak/feedback/fbk_copy/resolution/evidence.json'))->toEqual($evidence);
 });
 
-it('rejects path traversal evidence paths without mutating the record', function (): void {
-    $record = writeFeedbackRecord([
+test('resolves pending feedback from a handoff artifact produced by the handoff command', function (): void {
+    $this->feedback->writeRecord([
+        'id' => 'fbk_handoff_artifact',
+        'status' => 'pending',
+    ]);
+
+    Artisan::call('iak:handoff', [
+        'action' => 'create',
+        '--json' => true,
+        '--run-id' => 'run_handoff_feedback',
+        '--task' => 'Create vehicle index page',
+        '--summary' => 'Vehicle index handoff is ready.',
+        '--changed-file' => [
+            'page:create:resources/js/pages/vehicles/index.tsx',
+        ],
+        '--feedback-unresolved' => '0',
+    ]);
+
+    $handoffPayload = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+    $artifactPath = $handoffPayload['artifacts']['handoff']['path'];
+
+    expect($artifactPath)->toBe('.iak/runs/run_handoff_feedback/handoff.json')
+        ->and($handoffPayload['schema'])->toBe('iak.handoff.v1');
+
+    [$exitCode, $resolvePayload] = $this->feedback->call([
+        'action' => 'resolve',
+        'id' => 'fbk_handoff_artifact',
+        '--evidence' => $artifactPath,
+    ]);
+
+    $updated = $this->feedback->readRecord('fbk_handoff_artifact');
+
+    expect($exitCode)->toBe(0)
+        ->and($resolvePayload['status'])->toBe('resolved')
+        ->and($resolvePayload['resolution']['linkedEvidence'])->toBe($artifactPath)
+        ->and($resolvePayload['resolution']['evidenceCopiedTo'])->toBe('.iak/feedback/fbk_handoff_artifact/resolution/evidence.json')
+        ->and($updated['status'])->toBe('resolved')
+        ->and($updated['resolution']['changedFiles'])->toEqual($handoffPayload['changedFiles'])
+        ->and($this->feedback->readJson('.iak/feedback/fbk_handoff_artifact/resolution/evidence.json'))->toEqual($handoffPayload);
+});
+
+test('rejects path traversal evidence paths without mutating the record', function (): void {
+    $record = $this->feedback->writeRecord([
         'id' => 'fbk_traversal',
         'status' => 'pending',
     ]);
 
-    [$exitCode, $payload] = callFeedbackCommand([
+    [$exitCode, $payload] = $this->feedback->call([
         'action' => 'resolve',
         'id' => 'fbk_traversal',
         '--evidence' => '../outside.json',
@@ -328,145 +374,260 @@ it('rejects path traversal evidence paths without mutating the record', function
 
     expect($exitCode)->toBe(2)
         ->and($payload['error']['code'])->toBe('feedback.evidence_invalid_path')
-        ->and(readFeedbackRecord('fbk_traversal'))->toEqual($record)
+        ->and($this->feedback->readRecord('fbk_traversal'))->toEqual($record)
         ->and(file_exists(base_path('.iak/feedback/fbk_traversal/resolution/evidence.json')))->toBeFalse();
 });
 
-/**
- * @param array<string, mixed> $arguments
- *
- * @return array{0: int, 1: array<string, mixed>}
- */
-function callFeedbackCommand(array $arguments): array
-{
-    $exitCode = Artisan::call('iak:feedback', [
-        ...$arguments,
-        '--json' => true,
+test('rejects unsupported feedback actions', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'invalid',
     ]);
 
-    return [
-        $exitCode,
-        json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR),
-    ];
-}
+    expect($exitCode)->toBe(2)
+        ->and($payload['error']['code'])->toBe('feedback.invalid_action');
+});
 
-/**
- * @param array<string, mixed> $overrides
- *
- * @return array<string, mixed>
- */
-function writeFeedbackRecord(array $overrides = []): array
-{
-    $id = (string) ($overrides['id'] ?? 'fbk_default');
-    $record = array_replace_recursive([
-        'schema' => 'iak.feedback.v1',
-        'id' => $id,
+test('rejects invalid list status filters', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'list',
+        '--status' => 'archived',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['error']['code'])->toBe('feedback.invalid_status')
+        ->and($payload['error']['details']['status'])->toBe('archived');
+});
+
+test('rejects invalid list limit values', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'list',
+        '--limit' => '0',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['error']['code'])->toBe('feedback.invalid_limit')
+        ->and($payload['error']['details']['limit'])->toBe('0');
+});
+
+test('requires an id for show action', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'show',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['error']['code'])->toBe('feedback.id_required');
+});
+
+test('rejects resolving feedback that is already resolved', function (): void {
+    $this->feedback->writeRecord([
+        'id' => 'fbk_closed',
+        'status' => 'resolved',
+    ]);
+    $this->feedback->writeJson('.iak/runs/run_resolve_blocked/verify.json', [
+        'schema' => 'iak.verify.v1',
+    ]);
+
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'resolve',
+        'id' => 'fbk_closed',
+        '--evidence' => '.iak/runs/run_resolve_blocked/verify.json',
+    ]);
+
+    expect($exitCode)->toBe(1)
+        ->and($payload['error']['code'])->toBe('feedback.invalid_transition')
+        ->and($payload['error']['details']['status'])->toBe('resolved')
+        ->and($this->feedback->readRecord('fbk_closed')['status'])->toBe('resolved');
+});
+
+test('requires JSON for pretty output', function (): void {
+    $exitCode = Artisan::call('iak:feedback', [
+        'action' => 'list',
+        '--pretty' => true,
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and(Artisan::output())->toContain('The --pretty option is only valid with JSON output.');
+});
+
+test('returns a structured internal error when command execution throws a runtime exception', function (): void {
+    $command = new FeedbackCommand;
+    $command->setLaravel($this->app);
+
+    $input = new ArrayInput([
+        'action' => 'list',
+        '--json' => true,
+    ], $command->getDefinition());
+    $output = new ThrowingOutput;
+
+    $exitCode = $command->run($input, $output);
+    $payload = json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($exitCode)->toBe(4)
+        ->and($payload['error']['code'])->toBe('feedback.internal')
+        ->and($payload['error']['message'])->toBe('An unexpected feedback command error occurred.')
+        ->and($payload['error']['details']['exception'])->toBe('RuntimeException');
+});
+
+test('filters list output by source and excludes mismatched records', function (): void {
+    $this->feedback->writeRecord([
+        'id' => 'fbk_source_match',
         'status' => 'pending',
         'surface' => 'app',
         'source' => 'human',
-        'producer' => 'iak.test',
-        'target' => [
-            'url' => 'http://localhost/vehicles',
-            'route' => 'vehicles.index',
-            'storyId' => null,
-            'selector' => "[data-iak-part='filter-bar']",
-        ],
-        'viewport' => [
-            'width' => 1440,
-            'height' => 900,
-            'name' => 'desktop',
-        ],
-        'message' => 'This should reuse the standard filter bar pattern.',
-        'tags' => [
-            'pattern',
-            'filter-bar',
-        ],
-        'attachments' => [
-            'screenshot' => ".iak/feedback/{$id}/screenshot.png",
-            'dom' => ".iak/feedback/{$id}/dom.html",
-            'console' => ".iak/feedback/{$id}/console.json",
-            'network' => null,
-            'trace' => null,
-        ],
-        'context' => [
-            'gitSha' => null,
-            'branch' => 'feat/feedback',
-            'adapter' => 'laravel-inertia-react',
-            'componentCandidates' => [
-                'FilterBar',
-            ],
-            'storyArgs' => null,
-            'testRunId' => null,
-        ],
-        'resolution' => null,
-        'createdAt' => '2026-05-22T15:00:00Z',
-        'updatedAt' => '2026-05-22T15:00:00Z',
-    ], $overrides);
+        'createdAt' => '2026-05-22T18:00:00Z',
+    ]);
+    $this->feedback->writeRecord([
+        'id' => 'fbk_source_skip',
+        'status' => 'pending',
+        'surface' => 'app',
+        'source' => 'agent',
+        'createdAt' => '2026-05-22T18:00:00Z',
+    ]);
 
-    writeJsonFixture(".iak/feedback/{$id}/record.json", $record);
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'list',
+        '--status' => 'all',
+        '--surface' => 'app',
+        '--source' => 'human',
+    ]);
 
-    return $record;
-}
+    expect($exitCode)->toBe(0)
+        ->and(array_column($payload['items'], 'id'))->toBe(['fbk_source_match']);
+});
 
-/**
- * @return array<string, mixed>
- */
-function readFeedbackRecord(string $id): array
-{
-    return readJsonFixture(".iak/feedback/{$id}/record.json");
-}
+test('orders tied feedback entries by identifier', function (): void {
+    $this->feedback->writeRecord([
+        'id' => 'fbk_tiebreak_first',
+        'status' => 'pending',
+        'surface' => 'app',
+        'source' => 'human',
+        'createdAt' => '2026-05-22T16:00:00Z',
+    ]);
+    $this->feedback->writeRecord([
+        'id' => 'fbk_tiebreak_second',
+        'status' => 'pending',
+        'surface' => 'app',
+        'source' => 'human',
+        'createdAt' => '2026-05-22T16:00:00Z',
+    ]);
 
-/**
- * @param array<string, mixed> $payload
- */
-function writeJsonFixture(string $relativePath, array $payload): void
-{
-    writeRawFixture(
-        $relativePath,
-        json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR).PHP_EOL,
-    );
-}
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'list',
+        '--status' => 'all',
+        '--surface' => 'app',
+        '--source' => 'human',
+    ]);
 
-function writeRawFixture(string $relativePath, string $contents): void
-{
-    $path = base_path($relativePath);
-    $directory = dirname($path);
+    expect($exitCode)->toBe(0)
+        ->and($payload['items'][0]['id'])->toBe('fbk_tiebreak_second')
+        ->and($payload['items'][1]['id'])->toBe('fbk_tiebreak_first');
+});
 
-    if (! is_dir($directory)) {
-        mkdir($directory, 0755, true);
+test('returns not found for missing feedback records on resolve', function (): void {
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'resolve',
+        'id' => 'fbk_resolve_missing',
+        '--evidence' => '.iak/runs/missing.json',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['error']['code'])->toBe('feedback.not_found')
+        ->and($payload['error']['file'])->toBe('.iak/feedback/fbk_resolve_missing/record.json');
+});
+
+test('uses fallback evidence summary when evidence contains no summary fields', function (): void {
+    $this->feedback->writeRecord([
+        'id' => 'fbk_empty_summary',
+        'status' => 'pending',
+    ]);
+    $this->feedback->writeRaw('.iak/runs/run_summary/empty.json', '{"schema":"iak.verify.v1"}');
+
+    [$exitCode, $payload] = $this->feedback->call([
+        'action' => 'resolve',
+        'id' => 'fbk_empty_summary',
+        '--evidence' => '.iak/runs/run_summary/empty.json',
+    ]);
+
+    expect($exitCode)->toBe(0)
+        ->and($payload['status'])->toBe('resolved')
+        ->and($payload['resolution']['summary'])->toBe('Resolved with linked evidence.')
+        ->and($payload['resolution']['evidenceSummary'])->toBe('');
+});
+
+test('falls back to feedback.json_encode_failed when JSON output cannot be encoded', function (): void {
+    $previousPath = config('inertia-agent-kit.feedback.path');
+    $invalidPath = "\xC3\x28";
+
+    try {
+        config()->set('inertia-agent-kit.feedback.path', $invalidPath);
+
+        $exitCode = Artisan::call('iak:feedback', [
+            'action' => 'list',
+            '--json' => true,
+        ]);
+        $payload = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+        expect($exitCode)->toBe(4)
+            ->and($payload['schema'])->toBe('iak.error.v1')
+            ->and($payload['error']['code'])->toBe('feedback.json_encode_failed');
+    } finally {
+        config()->set('inertia-agent-kit.feedback.path', $previousPath);
     }
+});
 
-    file_put_contents($path, $contents);
-}
+test('returns plain text output when json is not requested', function (): void {
+    $exitCode = Artisan::call('iak:feedback', [
+        'action' => 'show',
+        'id' => 'fbk_missing_plain',
+    ]);
+    $output = Artisan::output();
 
-/**
- * @return array<string, mixed>
- */
-function readJsonFixture(string $relativePath): array
-{
-    return json_decode((string) file_get_contents(base_path($relativePath)), true, 512, JSON_THROW_ON_ERROR);
-}
+    expect($exitCode)->toBe(2)
+        ->and($output)->toContain('Feedback record fbk_missing_plain was not found.');
+});
 
-function removeFeedbackFixtureDirectory(string $path): void
-{
-    if (! is_dir($path)) {
-        return;
-    }
+test('returns plain text output for empty list when json is not requested', function (): void {
+    $exitCode = Artisan::call('iak:feedback', [
+        'action' => 'list',
+    ]);
+    $output = Artisan::output();
 
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST,
-    );
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Found 0 feedback record(s).');
+});
 
-    foreach ($iterator as $file) {
-        if ($file->isDir()) {
-            rmdir($file->getPathname());
+test('supports pretty JSON list output', function (): void {
+    $exitCode = Artisan::call('iak:feedback', [
+        'action' => 'list',
+        '--json' => true,
+        '--pretty' => true,
+    ]);
+    $output = Artisan::output();
+    $payload = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
 
-            continue;
+    expect($exitCode)->toBe(0)
+        ->and(str_starts_with(trim($output), '{'))
+        ->toBeTrue()
+        ->and($payload['schema'])->toBe('iak.feedback.list.v1');
+});
+
+test('emits JSON when IAK_AGENT environment variable is set', function (): void {
+    $previousAgentEnv = getenv('IAK_AGENT');
+
+    try {
+        putenv('IAK_AGENT=1');
+        $exitCode = Artisan::call('iak:feedback', [
+            'action' => 'list',
+        ]);
+        $payload = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+        expect($exitCode)->toBe(0)
+            ->and($payload['schema'])->toBe('iak.feedback.list.v1');
+    } finally {
+        if ($previousAgentEnv === false) {
+            putenv('IAK_AGENT');
+        } else {
+            putenv('IAK_AGENT='.$previousAgentEnv);
         }
-
-        unlink($file->getPathname());
     }
-
-    rmdir($path);
-}
+});

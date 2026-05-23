@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use InertiaAgentKit\Feedback\FeedbackEvidenceValidator;
 use InertiaAgentKit\Feedback\FeedbackException;
 use InertiaAgentKit\Feedback\FeedbackStore;
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
 use Throwable;
@@ -31,7 +32,7 @@ final class FeedbackCommand extends Command
     public function handle(): int
     {
         $paths = new ProjectPaths($this->laravel);
-        $store = new FeedbackStore($paths, (string) config('inertia-agent-kit.feedback.path', '.iak/feedback'));
+        $store = new FeedbackStore($paths, $this->configString('inertia-agent-kit.feedback.path', '.iak/feedback'));
         $evidenceValidator = new FeedbackEvidenceValidator($paths);
 
         try {
@@ -99,17 +100,22 @@ final class FeedbackCommand extends Command
             : array_values(array_filter($records, static fn (array $record): bool => ($record['status'] ?? null) === $status));
 
         usort($filtered, static function (array $left, array $right): int {
-            $created = strcmp((string) ($right['createdAt'] ?? ''), (string) ($left['createdAt'] ?? ''));
+            $rightCreatedAt = is_string($right['createdAt'] ?? null) ? $right['createdAt'] : '';
+            $leftCreatedAt = is_string($left['createdAt'] ?? null) ? $left['createdAt'] : '';
+            $created = strcmp($rightCreatedAt, $leftCreatedAt);
 
             if ($created !== 0) {
                 return $created;
             }
 
-            return strcmp((string) ($right['id'] ?? ''), (string) ($left['id'] ?? ''));
+            $rightId = is_string($right['id'] ?? null) ? $right['id'] : '';
+            $leftId = is_string($left['id'] ?? null) ? $left['id'] : '';
+
+            return strcmp($rightId, $leftId);
         });
 
         $items = array_map(
-            fn (array $record): array => $this->summaryItem($record),
+            $this->summaryItem(...),
             array_slice($filtered, 0, $limit),
         );
 
@@ -176,12 +182,12 @@ final class FeedbackCommand extends Command
             throw $this->notFound($store, $id);
         }
 
-        $currentStatus = $record['status'] ?? null;
+        $currentStatus = is_string($record['status'] ?? null) ? $record['status'] : null;
 
         if (! in_array($currentStatus, ['pending', 'in_progress'], true)) {
             throw new FeedbackException(
                 'feedback.invalid_transition',
-                "Feedback record {$id} cannot be resolved from status [{$currentStatus}].",
+                'Feedback record '.$id.' cannot be resolved from status ['.($currentStatus ?? 'unknown').'].',
                 self::FAILURE,
                 $store->recordPath($id),
                 ['status' => $currentStatus],
@@ -230,8 +236,7 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $record
-     *
+     * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
     private function summaryItem(array $record): array
@@ -251,7 +256,7 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param list<array<string, mixed>> $records
+     * @param  list<array<string, mixed>>  $records
      */
     private function countStatus(array $records, string $status): int
     {
@@ -321,8 +326,7 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $evidence
-     *
+     * @param  array<string, mixed>  $evidence
      * @return array<string, mixed>
      */
     private function resolution(array $evidence, string $linkedEvidence, string $copiedTo): array
@@ -354,7 +358,7 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $evidence
+     * @param  array<string, mixed>  $evidence
      */
     private function evidenceSummary(array $evidence): string
     {
@@ -375,10 +379,9 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $source
-     * @param array<int, string> ...$paths
-     *
-     * @return array<string, mixed>|list<mixed>
+     * @param  array<string, mixed>  $source
+     * @param  array<int, string>  ...$paths
+     * @return array<int|string, mixed>
      */
     private function arrayValue(array $source, array ...$paths): array
     {
@@ -386,7 +389,9 @@ final class FeedbackCommand extends Command
             $value = $this->valueAt($source, $path);
 
             if (is_array($value)) {
-                return $value;
+                $map = ArrayData::stringMap($value);
+
+                return $map !== [] ? $map : array_values($value);
             }
         }
 
@@ -394,8 +399,8 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $source
-     * @param array<int, string> $path
+     * @param  array<string, mixed>  $source
+     * @param  array<int, string>  $path
      */
     private function valueAt(array $source, array $path): mixed
     {
@@ -423,7 +428,7 @@ final class FeedbackCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function respond(array $payload, string $humanLine, int $status = self::SUCCESS): int
     {
@@ -464,8 +469,15 @@ final class FeedbackCommand extends Command
         return getenv('IAK_AGENT') === '1' || (bool) $this->option('json');
     }
 
+    private function configString(string $key, string $default): string
+    {
+        $value = config($key, $default);
+
+        return $value !== '' ? $value : $default;
+    }
+
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function emitJson(array $payload, int $status): int
     {

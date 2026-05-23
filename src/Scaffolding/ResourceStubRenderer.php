@@ -6,15 +6,14 @@ namespace InertiaAgentKit\Scaffolding;
 
 use RuntimeException;
 
-final class ResourceStubRenderer
+final readonly class ResourceStubRenderer
 {
     public function __construct(
-        private readonly string $stubRoot = __DIR__.'/../../resources/stubs'
-    ) {
-    }
+        private string $stubRoot = __DIR__.'/../../resources/stubs'
+    ) {}
 
     /**
-     * @param array<string, string> $context
+     * @param  array<string, string>  $context
      */
     public function render(string $adapter, string $stub, array $context): string
     {

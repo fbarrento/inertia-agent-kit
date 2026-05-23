@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Artisan;
+use InertiaAgentKit\Console\InitCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Tests\Utils\InitCommandTestHelper;
 
 beforeEach(function (): void {
     $this->basePath = sys_get_temp_dir().'/iak-init-test-'.bin2hex(random_bytes(6));
@@ -31,7 +33,7 @@ afterEach(function (): void {
     rmdir($directory);
 });
 
-it('emits one init result json object and creates the expected files under the app base path', function (): void {
+test('emits one init result json object and creates the expected files under the app base path', function (): void {
     $exitCode = Artisan::call('iak:init', [
         '--json' => true,
     ]);
@@ -100,7 +102,7 @@ it('emits one init result json object and creates the expected files under the a
         ->and($manifest['commands'])->not->toHaveKey('manifest');
 });
 
-it('reports existing generated files as unchanged on a second run', function (): void {
+test('reports existing generated files as unchanged on a second run', function (): void {
     Artisan::call('iak:init', [
         '--json' => true,
     ]);
@@ -112,12 +114,12 @@ it('reports existing generated files as unchanged on a second run', function ():
     $payload = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
 
     expect($exitCode)->toBe(0)
-        ->and(actionForPath($payload, 'config/inertia-agent-kit.php'))->toBe('unchanged')
-        ->and(actionForPath($payload, 'iak.config.json'))->toBe('unchanged')
-        ->and(actionForPath($payload, '.iak/manifest/iak.manifest.v1.json'))->toBe('unchanged');
+        ->and(InitCommandTestHelper::actionForPath($payload, 'config/inertia-agent-kit.php'))->toBe('unchanged')
+        ->and(InitCommandTestHelper::actionForPath($payload, 'iak.config.json'))->toBe('unchanged')
+        ->and(InitCommandTestHelper::actionForPath($payload, '.iak/manifest/iak.manifest.v1.json'))->toBe('unchanged');
 });
 
-it('preserves user edited source controlled config files', function (): void {
+test('preserves user edited source controlled config files', function (): void {
     Artisan::call('iak:init', [
         '--json' => true,
     ]);
@@ -143,11 +145,11 @@ it('preserves user edited source controlled config files', function (): void {
     expect($exitCode)->toBe(0)
         ->and(file_get_contents(($this->path)('config/inertia-agent-kit.php')))->toBe($phpConfig)
         ->and(file_get_contents(($this->path)('iak.config.json')))->toBe($jsonConfig)
-        ->and(actionForPath($payload, 'config/inertia-agent-kit.php'))->toBe('skipped')
-        ->and(actionForPath($payload, 'iak.config.json'))->toBe('skipped');
+        ->and(InitCommandTestHelper::actionForPath($payload, 'config/inertia-agent-kit.php'))->toBe('skipped')
+        ->and(InitCommandTestHelper::actionForPath($payload, 'iak.config.json'))->toBe('skipped');
 });
 
-it('returns structured json and exit code two for unsupported adapters', function (): void {
+test('returns structured json and exit code two for unsupported adapters', function (): void {
     $exitCode = Artisan::call('iak:init', [
         '--json' => true,
         '--adapter' => 'vue',
@@ -164,7 +166,7 @@ it('returns structured json and exit code two for unsupported adapters', functio
         ->and(file_exists(($this->path)('.iak')))->toBeFalse();
 });
 
-it('pretty prints json when requested', function (): void {
+test('pretty prints json when requested', function (): void {
     $exitCode = Artisan::call('iak:init', [
         '--json' => true,
         '--pretty' => true,
@@ -178,16 +180,40 @@ it('pretty prints json when requested', function (): void {
         ->and($output)->toContain(PHP_EOL.'    "event": "iak.init.completed.v1"');
 });
 
-/**
- * @param array<string, mixed> $payload
- */
-function actionForPath(array $payload, string $path): ?string
-{
-    foreach ($payload['files'] ?? [] as $file) {
-        if (($file['path'] ?? null) === $path) {
-            return is_string($file['action'] ?? null) ? $file['action'] : null;
-        }
-    }
+test('returns plain text output when json flag is not set', function (): void {
+    $exitCode = Artisan::call('iak:init', []);
 
-    return null;
-}
+    expect($exitCode)->toBe(0)
+        ->and(Artisan::output())->toContain('IAK initialized for Laravel Inertia React.');
+});
+
+test('normalizes adapter option when option value is non-scalar', function (): void {
+    $command = app(InitCommand::class);
+    $input = Mockery::mock(InputInterface::class);
+
+    $input->shouldReceive('getOption')->with('adapter')->andReturn(['react']);
+    $input->shouldReceive('getArgument')->with('resource')->andReturnNull();
+
+    $inputProperty = new ReflectionProperty($command, 'input');
+    $inputProperty->setValue($command, $input);
+
+    $method = new ReflectionMethod($command, 'nullableOption');
+
+    $value = $method->invoke($command, 'adapter');
+
+    expect($value)->toBeNull();
+});
+
+test('normalizes adapter option when option value is boolean', function (): void {
+    $command = app(InitCommand::class);
+    $input = Mockery::mock(InputInterface::class);
+
+    $input->shouldReceive('getOption')->with('adapter')->andReturn(false);
+
+    $inputProperty = new ReflectionProperty($command, 'input');
+    $inputProperty->setValue($command, $input);
+
+    $method = new ReflectionMethod($command, 'nullableOption');
+
+    expect($method->invoke($command, 'adapter'))->toBeNull();
+});

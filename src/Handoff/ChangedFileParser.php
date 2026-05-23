@@ -4,41 +4,13 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Handoff;
 
+use InertiaAgentKit\Enum\ChangedFileAction;
+use InertiaAgentKit\Enum\ChangedFileRole;
+
 final class ChangedFileParser
 {
     /**
-     * @var list<string>
-     */
-    private const ROLES = [
-        'page',
-        'feature',
-        'story',
-        'component-ui',
-        'component-app',
-        'layout',
-        'type',
-        'config',
-        'test',
-        'docs',
-        'boost',
-        'package',
-        'resource',
-        'other',
-    ];
-
-    /**
-     * @var list<string>
-     */
-    private const ACTIONS = [
-        'create',
-        'modify',
-        'delete',
-        'rename',
-    ];
-
-    /**
-     * @param list<string> $entries
-     *
+     * @param  list<string>  $entries
      * @return array{changedFiles: array<string, list<array{path: string, action: string}>>, errors: list<array<string, mixed>>}
      */
     public function parse(array $entries): array
@@ -46,19 +18,8 @@ final class ChangedFileParser
         $changedFiles = [];
         $errors = [];
 
-        foreach (array_values($entries) as $index => $entry) {
-            if (! is_scalar($entry) || is_bool($entry)) {
-                $errors[] = $this->error(
-                    'changed_file.invalid_entry',
-                    'Changed file entries must be strings in role:action:path format.',
-                    $index,
-                    $entry
-                );
-
-                continue;
-            }
-
-            $rawEntry = trim((string) $entry);
+        foreach ($entries as $index => $entry) {
+            $rawEntry = trim($entry);
             $parts = explode(':', $rawEntry, 3);
 
             if (count($parts) !== 3) {
@@ -77,7 +38,7 @@ final class ChangedFileParser
             $path = trim($parts[2]);
             $entryErrors = [];
 
-            if (! in_array($role, self::ROLES, true)) {
+            if (ChangedFileRole::tryFrom($role) === null) {
                 $entryErrors[] = $this->error(
                     'changed_file.invalid_role',
                     'Changed file role is not supported.',
@@ -85,12 +46,12 @@ final class ChangedFileParser
                     $rawEntry,
                     [
                         'role' => $role,
-                        'allowed' => self::ROLES,
+                        'allowed' => ChangedFileRole::values(),
                     ]
                 );
             }
 
-            if (! in_array($action, self::ACTIONS, true)) {
+            if (ChangedFileAction::tryFrom($action) === null) {
                 $entryErrors[] = $this->error(
                     'changed_file.invalid_action',
                     'Changed file action is not supported.',
@@ -98,7 +59,7 @@ final class ChangedFileParser
                     $rawEntry,
                     [
                         'action' => $action,
-                        'allowed' => self::ACTIONS,
+                        'allowed' => ChangedFileAction::values(),
                     ]
                 );
             }
@@ -211,9 +172,7 @@ final class ChangedFileParser
     }
 
     /**
-     * @param mixed $entry
-     * @param array<string, mixed> $details
-     *
+     * @param  array<string, mixed>  $details
      * @return array<string, mixed>
      */
     private function error(string $code, string $message, int $index, mixed $entry, array $details = []): array

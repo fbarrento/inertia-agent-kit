@@ -9,7 +9,10 @@ use Illuminate\Support\Str;
 use InertiaAgentKit\Support\ProjectPaths;
 use RuntimeException;
 
-final class ResourceScaffolder
+/**
+ * @phpstan-type ResourcePlan array{name: string, singular: string, folder: string, routeName: string, controller: string, controllerBasename: string, singularStudly: string, pluralStudly: string, generatedTypeNamespace: string}
+ */
+final readonly class ResourceScaffolder
 {
     private const SCHEMA = 'iak.scaffold-plan.v1';
 
@@ -42,11 +45,11 @@ final class ResourceScaffolder
         'empty-state.tsx.stub' => ':singular-empty-state.tsx',
     ];
 
-    private readonly ProjectPaths $paths;
+    private ProjectPaths $paths;
 
     public function __construct(
-        private readonly Application $app,
-        private readonly ResourceStubRenderer $renderer = new ResourceStubRenderer()
+        Application $app,
+        private ResourceStubRenderer $renderer = new ResourceStubRenderer
     ) {
         $this->paths = new ProjectPaths($app);
     }
@@ -56,10 +59,11 @@ final class ResourceScaffolder
      */
     public function scaffold(ResourceScaffoldOptions $options): array
     {
+        /** @var array<int, array<string, mixed>> $errors */
         $errors = [];
         $warnings = [];
 
-        $adapter = $options->adapter !== '' ? $options->adapter : (string) config('inertia-agent-kit.adapter', 'react');
+        $adapter = $options->adapter !== '' ? $options->adapter : $this->configString('inertia-agent-kit.adapter', 'react');
 
         if ($adapter !== 'react') {
             $errors[] = $this->error('unsupported-adapter', 'Only the react adapter is supported in this package port.', [
@@ -132,9 +136,8 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $errors
-     *
-     * @return array<string, mixed>
+     * @param  array<int, array<string, mixed>>  $errors
+     * @return ResourcePlan
      */
     private function resolveResource(ResourceScaffoldOptions $options, array &$errors): array
     {
@@ -184,8 +187,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $errors
-     *
+     * @param  array<int, array<string, mixed>>  $errors
      * @return array<int, string>
      */
     private function selectedPageActions(ResourceScaffoldOptions $options, array &$errors): array
@@ -238,8 +240,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<string, string>
      */
     private function context(array $resource, string $adapter): array
@@ -263,7 +264,7 @@ final class ResourceScaffolder
             'pluralCamel' => Str::camel($pluralStudly),
             'singularStudly' => $singularStudly,
             'pluralStudly' => $pluralStudly,
-            'generatedTypeAlias' => (string) config('inertia-agent-kit.generated.type_alias', '@/types/generated'),
+            'generatedTypeAlias' => $this->configString('inertia-agent-kit.generated.type_alias', '@/types/generated'),
             'generatedTypeNamespace' => (string) $resource['generatedTypeNamespace'],
             'actionsImportPath' => '@/actions/generated/'.str_replace('\\', '/', (string) $resource['controller']),
             'routesImportPath' => '@/routes/generated/'.$folder,
@@ -289,17 +290,16 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     * @param array<int, string> $pageActions
-     * @param array<string, string> $context
-     *
+     * @param  ResourcePlan  $resource
+     * @param  array<int, string>  $pageActions
+     * @param  array<string, string>  $context
      * @return array<int, array<string, mixed>>
      */
     private function plannedFiles(array $resource, array $pageActions, array $context): array
     {
         $files = [];
-        $pagesPath = (string) config('inertia-agent-kit.paths.pages', 'resources/js/pages');
-        $featuresPath = (string) config('inertia-agent-kit.paths.features', 'resources/js/features');
+        $pagesPath = $this->configString('inertia-agent-kit.paths.pages', 'resources/js/pages');
+        $featuresPath = $this->configString('inertia-agent-kit.paths.features', 'resources/js/features');
         $folder = (string) $resource['folder'];
 
         foreach ($pageActions as $pageAction) {
@@ -334,9 +334,8 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     * @param array<int, string> $pageActions
-     *
+     * @param  ResourcePlan  $resource
+     * @param  array<int, string>  $pageActions
      * @return array<int, array<string, string>>
      */
     private function controllerMap(array $resource, array $pageActions): array
@@ -345,31 +344,29 @@ final class ResourceScaffolder
             fn (string $action): array => [
                 'controllerAction' => $resource['controllerBasename'].'@'.$action,
                 'route' => $resource['routeName'].'.'.$action,
-                'page' => config('inertia-agent-kit.paths.pages', 'resources/js/pages').'/'.$resource['folder'].'/'.$action.'.tsx',
+                'page' => $this->configString('inertia-agent-kit.paths.pages', 'resources/js/pages').'/'.$resource['folder'].'/'.$action.'.tsx',
             ],
             $pageActions
         );
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<int, array<string, mixed>>
      */
     private function generatedTypeImports(array $resource): array
     {
         return [
             [
-                'from' => (string) config('inertia-agent-kit.generated.type_alias', '@/types/generated'),
+                'from' => $this->configString('inertia-agent-kit.generated.type_alias', '@/types/generated'),
                 'symbols' => ['App'],
-                'usedBy' => config('inertia-agent-kit.paths.features', 'resources/js/features').'/'.$resource['folder'].'/'.$resource['singular'].'.types.ts',
+                'usedBy' => $this->configString('inertia-agent-kit.paths.features', 'resources/js/features').'/'.$resource['folder'].'/'.$resource['singular'].'.types.ts',
             ],
         ];
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<int, array<string, mixed>>
      */
     private function wayfinderImports(array $resource): array
@@ -387,13 +384,12 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<int, array<string, mixed>>
      */
     private function stories(array $resource): array
     {
-        $featuresPath = (string) config('inertia-agent-kit.paths.features', 'resources/js/features');
+        $featuresPath = $this->configString('inertia-agent-kit.paths.features', 'resources/js/features');
         $basePath = "{$featuresPath}/{$resource['folder']}";
         $singular = (string) $resource['singular'];
         $singularStudly = (string) $resource['singularStudly'];
@@ -415,8 +411,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $files
-     *
+     * @param  array<int, array<string, mixed>>  $files
      * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, string>>, 2: array<int, string>}
      */
     private function markFileActions(array $files, bool $force): array
@@ -425,10 +420,12 @@ final class ResourceScaffolder
         $skippedFiles = [];
 
         foreach ($files as $index => $file) {
-            $absolute = $this->paths->absolute((string) $file['path']);
+            $path = $this->fileString($file, 'path');
+            $absolute = $this->paths->absolute($path);
 
             if (! is_file($absolute)) {
                 $files[$index]['action'] = 'create';
+
                 continue;
             }
 
@@ -437,27 +434,28 @@ final class ResourceScaffolder
             if (! str_contains($contents, self::GENERATED_MARKER)) {
                 $files[$index]['action'] = 'conflict';
                 $conflicts[] = [
-                    'path' => (string) $file['path'],
+                    'path' => $path,
                     'reason' => 'existing user-owned file',
                 ];
+
                 continue;
             }
 
             if ($force) {
                 $files[$index]['action'] = 'overwrite';
+
                 continue;
             }
 
             $files[$index]['action'] = 'skip';
-            $skippedFiles[] = (string) $file['path'];
+            $skippedFiles[] = $path;
         }
 
         return [$files, $conflicts, $skippedFiles];
     }
 
     /**
-     * @param array<int, array<string, mixed>> $files
-     *
+     * @param  array<int, array<string, mixed>>  $files
      * @return array<int, string>
      */
     private function writeFiles(array $files): array
@@ -469,14 +467,14 @@ final class ResourceScaffolder
                 continue;
             }
 
-            $path = (string) $file['path'];
+            $path = $this->fileString($file, 'path');
             $directory = dirname($this->paths->absolute($path));
 
             if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
                 throw new RuntimeException("Unable to create directory [{$directory}].");
             }
 
-            if (file_put_contents($this->paths->absolute($path), (string) $file['contents']) === false) {
+            if (file_put_contents($this->paths->absolute($path), $this->fileString($file, 'contents')) === false) {
                 throw new RuntimeException("Unable to write file [{$path}].");
             }
 
@@ -487,8 +485,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $files
-     *
+     * @param  array<int, array<string, mixed>>  $files
      * @return array<int, array<string, mixed>>
      */
     private function publicFiles(array $files): array
@@ -505,13 +502,12 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<int, array<string, mixed>>
      */
     private function validateGeneratedTypes(array $resource): array
     {
-        $path = (string) config('inertia-agent-kit.generated.types', 'resources/js/types/generated/index.d.ts');
+        $path = $this->configString('inertia-agent-kit.generated.types', 'resources/js/types/generated/index.d.ts');
         $absolute = $this->paths->absolute($path);
 
         if (! is_file($absolute)) {
@@ -538,8 +534,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $resource
-     *
+     * @param  ResourcePlan  $resource
      * @return array<int, string>
      */
     private function expectedGeneratedSymbols(array $resource): array
@@ -562,7 +557,7 @@ final class ResourceScaffolder
         $resource = str_replace('/', '.', trim($resource, " \t\n\r\0\x0B./"));
         $segments = array_values(array_filter(explode('.', $resource), static fn (string $segment): bool => trim($segment) !== ''));
 
-        return implode('.', array_map(fn (string $segment): string => $this->normalizeKebab($segment), $segments));
+        return implode('.', array_map($this->normalizeKebab(...), $segments));
     }
 
     private function normalizeKebab(string $value): string
@@ -581,7 +576,7 @@ final class ResourceScaffolder
     private function csv(string $value): array
     {
         return array_values(array_filter(
-            array_map(static fn (string $item): string => trim($item), explode(',', strtolower($value))),
+            array_map(trim(...), explode(',', strtolower($value))),
             static fn (string $item): bool => $item !== ''
         ));
     }
@@ -602,8 +597,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @param array<string, mixed> $context
-     *
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function error(string $code, string $message, array $context = []): array
@@ -616,7 +610,7 @@ final class ResourceScaffolder
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ResourcePlan
      */
     private function emptyResource(): array
     {
@@ -626,6 +620,31 @@ final class ResourceScaffolder
             'folder' => '',
             'routeName' => '',
             'controller' => '',
+            'controllerBasename' => '',
+            'singularStudly' => '',
+            'pluralStudly' => '',
+            'generatedTypeNamespace' => '',
         ];
+    }
+
+    private function configString(string $key, string $default): string
+    {
+        $value = config($key);
+
+        return is_string($value) && $value !== '' ? $value : $default;
+    }
+
+    /**
+     * @param  array<string, mixed>  $file
+     */
+    private function fileString(array $file, string $key): string
+    {
+        $value = $file[$key] ?? null;
+
+        if (! is_string($value)) {
+            throw new RuntimeException("Generated file [{$key}] must be a string.");
+        }
+
+        return $value;
     }
 }

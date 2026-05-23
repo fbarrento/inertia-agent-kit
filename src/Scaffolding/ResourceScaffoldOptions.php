@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Scaffolding;
 
-final class ResourceScaffoldOptions
+final readonly class ResourceScaffoldOptions
 {
     public function __construct(
-        public readonly string $resource,
-        public readonly string $adapter,
-        public readonly bool $dryRun,
-        public readonly bool $force,
-        public readonly ?string $singular,
-        public readonly ?string $only,
-        public readonly ?string $except,
-        public readonly bool $allowMissingGeneratedTypes,
-        public readonly ?string $controller,
-        public readonly ?string $routeName,
-        public readonly string $command,
-    ) {
-    }
+        public string $resource,
+        public string $adapter,
+        public bool $dryRun,
+        public bool $force,
+        public ?string $singular,
+        public ?string $only,
+        public ?string $except,
+        public bool $allowMissingGeneratedTypes,
+        public ?string $controller,
+        public ?string $routeName,
+        public string $command,
+    ) {}
 }

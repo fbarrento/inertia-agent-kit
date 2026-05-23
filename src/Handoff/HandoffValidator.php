@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Handoff;
 
+use InertiaAgentKit\Enum\ChangedFileAction;
+use InertiaAgentKit\Enum\ChangedFileRole;
+use InertiaAgentKit\Enum\EvidenceStatus;
+use InertiaAgentKit\Enum\HandoffStatus;
+use InertiaAgentKit\Support\ArrayData;
+
 final class HandoffValidator
 {
     private const SCHEMA = 'iak.handoff.v1';
@@ -23,38 +29,11 @@ final class HandoffValidator
         'errors',
     ];
 
-    /** @var list<string> */
-    private const CHANGED_FILE_ROLES = [
-        'page',
-        'feature',
-        'story',
-        'component-ui',
-        'component-app',
-        'layout',
-        'type',
-        'config',
-        'test',
-        'docs',
-        'boost',
-        'package',
-        'resource',
-        'other',
-    ];
-
-    /** @var list<string> */
-    private const CHANGED_FILE_ACTIONS = [
-        'create',
-        'modify',
-        'delete',
-        'rename',
-    ];
-
     /** @var list<array{code: string, message: string, file: string|null, line: int|null, details: array<string, mixed>}> */
     private array $errors = [];
 
     /**
-     * @param array<string, mixed> $payload
-     *
+     * @param  array<string, mixed>  $payload
      * @return array{valid: bool, status: 'valid'|'invalid', errors: list<array<string, mixed>>, nextActions: list<array<string, mixed>>}
      */
     public function validate(array $payload, string $basePath): array
@@ -66,7 +45,7 @@ final class HandoffValidator
         $this->validateSchema($payload);
 
         $status = $payload['status'] ?? null;
-        $isCompleted = $status === 'completed';
+        $isCompleted = $status === HandoffStatus::Completed->value;
 
         if (array_key_exists('status', $payload) && ! is_string($status)) {
             $this->addError(
@@ -103,14 +82,14 @@ final class HandoffValidator
 
         return [
             'valid' => $this->errors === [],
-            'status' => $this->errors === [] ? 'valid' : 'invalid',
+            'status' => $this->errors === [] ? HandoffStatus::Valid->value : HandoffStatus::Invalid->value,
             'errors' => $this->errors,
             'nextActions' => $this->extractNextActions($payload['nextActions'] ?? null),
         ];
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function validateRequiredFields(array $payload): void
     {
@@ -128,7 +107,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function validateSchema(array $payload): void
     {
@@ -173,13 +152,13 @@ final class HandoffValidator
         $entryCount = 0;
 
         foreach ($changedFiles as $role => $entries) {
-            if (! is_string($role) || ! in_array($role, self::CHANGED_FILE_ROLES, true)) {
+            if (! is_string($role) || ChangedFileRole::tryFrom($role) === null) {
                 $this->addError(
                     'handoff.changed_files.role_invalid',
                     'Handoff changedFiles contains an unsupported role.',
                     details: [
                         'role' => $role,
-                        'allowedRoles' => self::CHANGED_FILE_ROLES,
+                        'allowedRoles' => ChangedFileRole::values(),
                     ],
                 );
             }
@@ -246,7 +225,7 @@ final class HandoffValidator
                             'index' => $index,
                         ],
                     );
-                } elseif (! is_string($entry['action']) || ! in_array($entry['action'], self::CHANGED_FILE_ACTIONS, true)) {
+                } elseif (! is_string($entry['action']) || ChangedFileAction::tryFrom($entry['action']) === null) {
                     $this->addError(
                         'handoff.changed_files.action_invalid',
                         'Changed file actions must use the allowed action vocabulary.',
@@ -254,7 +233,7 @@ final class HandoffValidator
                             'role' => $role,
                             'index' => $index,
                             'action' => $entry['action'],
-                            'allowedActions' => self::CHANGED_FILE_ACTIONS,
+                            'allowedActions' => ChangedFileAction::values(),
                         ],
                     );
                 }
@@ -273,7 +252,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, true> $changedFilePaths
+     * @param  array<string, true>  $changedFilePaths
      */
     private function validateEvidence(
         mixed $evidence,
@@ -295,6 +274,8 @@ final class HandoffValidator
 
             return;
         }
+
+        $evidence = ArrayData::stringMap($evidence);
 
         if ($isCompleted) {
             $this->validateCompletedEvidenceStatus($evidence, 'audit');
@@ -324,7 +305,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, mixed> $evidence
+     * @param  array<string, mixed>  $evidence
      */
     private function validateCompletedEvidenceStatus(array $evidence, string $key): void
     {
@@ -341,7 +322,7 @@ final class HandoffValidator
             return;
         }
 
-        if ($status === 'failed') {
+        if ($status === EvidenceStatus::Failed->value) {
             $this->addError(
                 "handoff.evidence.{$key}_failed",
                 "Completed handoffs cannot reference failed {$key} evidence.",
@@ -354,7 +335,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, true> $changedFilePaths
+     * @param  array<string, true>  $changedFilePaths
      */
     private function validateArtifacts(mixed $artifacts, bool $isPresent, string $basePath, array $changedFilePaths): void
     {
@@ -378,7 +359,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, true> $changedFilePaths
+     * @param  array<string, true>  $changedFilePaths
      */
     private function validateArtifactTree(mixed $node, string $location, string $basePath, array $changedFilePaths): void
     {
@@ -404,7 +385,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, true> $changedFilePaths
+     * @param  array<string, true>  $changedFilePaths
      */
     private function validateArtifactReferences(mixed $node, string $location, string $basePath, array $changedFilePaths): void
     {
@@ -424,8 +405,8 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<mixed> $artifact
-     * @param array<string, true> $changedFilePaths
+     * @param  array<mixed>  $artifact
+     * @param  array<string, true>  $changedFilePaths
      */
     private function validateArtifactReference(array $artifact, string $location, string $basePath, array $changedFilePaths): void
     {
@@ -583,13 +564,15 @@ final class HandoffValidator
                 continue;
             }
 
-            if ($isCompleted && ($nextAction['blocking'] ?? null) !== false) {
+            $blocking = array_key_exists('blocking', $nextAction) ? $nextAction['blocking'] : null;
+
+            if ($isCompleted && $blocking !== false) {
                 $this->addError(
                     'handoff.next_actions.blocking',
                     'Completed handoffs can only include next actions when each one is explicitly non-blocking.',
                     details: [
                         'index' => $index,
-                        'blocking' => $nextAction['blocking'] ?? null,
+                        'blocking' => $blocking,
                     ],
                 );
             }
@@ -634,7 +617,11 @@ final class HandoffValidator
 
         foreach ($nextActions as $nextAction) {
             if (is_array($nextAction)) {
-                $items[] = $nextAction;
+                $nextAction = ArrayData::stringMap($nextAction);
+
+                if ($nextAction !== []) {
+                    $items[] = $nextAction;
+                }
             }
         }
 
@@ -675,7 +662,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<mixed> $node
+     * @param  array<mixed>  $node
      */
     private function looksLikeArtifactReference(array $node): bool
     {
@@ -683,7 +670,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<mixed> $node
+     * @param  array<mixed>  $node
      */
     private function isTerminalArray(array $node): bool
     {
@@ -716,11 +703,7 @@ final class HandoffValidator
 
     private function stringLength(string $value): int
     {
-        if (function_exists('mb_strlen')) {
-            return mb_strlen($value);
-        }
-
-        return strlen($value);
+        return function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
     }
 
     private function requiredFieldCode(string $field): string
@@ -731,7 +714,7 @@ final class HandoffValidator
     }
 
     /**
-     * @param array<string, mixed> $details
+     * @param  array<string, mixed>  $details
      */
     private function addError(
         string $code,

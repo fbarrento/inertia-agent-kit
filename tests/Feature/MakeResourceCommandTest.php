@@ -2,22 +2,28 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Artisan;
+use InertiaAgentKit\Console\MakeResourceCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Tests\Utils\MakeResourceCommandTestHelper;
 
-it('registers the iak:make-resource command', function (): void {
+beforeEach(function (): void {
+    $this->basePath = MakeResourceCommandTestHelper::fixtureBasePath();
+});
+
+test('registers the iak:make-resource command', function (): void {
     expect(Artisan::all())->toHaveKey('iak:make-resource');
 });
 
-it('emits one valid json object with the scaffold plan schema', function (): void {
-    $basePath = iakFixtureBasePath();
-    iakWriteGeneratedTypes($basePath);
+test('emits one valid json object with the scaffold plan schema', function (): void {
+    $basePath = $this->basePath;
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
     $exitCode = Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
         '--json' => true,
     ]);
 
-    $payload = iakJsonOutput();
+    $payload = MakeResourceCommandTestHelper::jsonOutput();
 
     expect($exitCode)->toBe(0)
         ->and($payload['schema'])->toBe('iak.scaffold-plan.v1')
@@ -42,9 +48,9 @@ it('emits one valid json object with the scaffold plan schema', function (): voi
         ->and($payload['errors'])->toBe([]);
 });
 
-it('scaffolds vehicles resource pages and feature files as react', function (): void {
-    $basePath = iakFixtureBasePath();
-    iakWriteGeneratedTypes($basePath);
+test('scaffolds vehicles resource pages and feature files as react', function (): void {
+    $basePath = $this->basePath;
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
     Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
@@ -79,9 +85,9 @@ it('scaffolds vehicles resource pages and feature files as react', function (): 
         ->toContain('Error');
 });
 
-it('supports dry-run without writing files', function (): void {
-    $basePath = iakFixtureBasePath();
-    iakWriteGeneratedTypes($basePath);
+test('supports dry-run without writing files', function (): void {
+    $basePath = $this->basePath;
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
     $exitCode = Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
@@ -89,7 +95,7 @@ it('supports dry-run without writing files', function (): void {
         '--json' => true,
     ]);
 
-    $payload = iakJsonOutput();
+    $payload = MakeResourceCommandTestHelper::jsonOutput();
 
     expect($exitCode)->toBe(0)
         ->and($payload['status'])->toBe('planned')
@@ -99,9 +105,9 @@ it('supports dry-run without writing files', function (): void {
         ->and(is_file($basePath.'/resources/js/features/vehicles/vehicle.types.ts'))->toBeFalse();
 });
 
-it('does not create top-level forbidden folders', function (): void {
-    $basePath = iakFixtureBasePath();
-    iakWriteGeneratedTypes($basePath);
+test('does not create top-level forbidden folders', function (): void {
+    $basePath = $this->basePath;
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
     Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
@@ -113,18 +119,18 @@ it('does not create top-level forbidden folders', function (): void {
     }
 });
 
-it('imports generated App types from the configured generated path', function (): void {
-    $basePath = iakFixtureBasePath();
+test('imports generated App types from the configured generated path', function (): void {
+    $basePath = $this->basePath;
 
     config()->set('inertia-agent-kit.generated.type_alias', '@/types/contracts');
-    iakWriteGeneratedTypes($basePath);
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
     Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
         '--json' => true,
     ]);
 
-    $payload = iakJsonOutput();
+    $payload = MakeResourceCommandTestHelper::jsonOutput();
     $types = file_get_contents($basePath.'/resources/js/features/vehicles/vehicle.types.ts');
 
     expect($payload['generatedTypeImports'][0]['from'])->toBe('@/types/contracts')
@@ -133,8 +139,8 @@ it('imports generated App types from the configured generated path', function ()
         ->and($types)->not->toContain('interface Vehicle');
 });
 
-it('allows missing generated types without writing fallback DTOs', function (): void {
-    $basePath = iakFixtureBasePath();
+test('allows missing generated types without writing fallback DTOs', function (): void {
+    $basePath = $this->basePath;
 
     $exitCode = Artisan::call('iak:make-resource', [
         'resource' => 'vehicles',
@@ -142,7 +148,7 @@ it('allows missing generated types without writing fallback DTOs', function (): 
         '--json' => true,
     ]);
 
-    $payload = iakJsonOutput();
+    $payload = MakeResourceCommandTestHelper::jsonOutput();
     $types = file_get_contents($basePath.'/resources/js/features/vehicles/vehicle.types.ts');
 
     expect($exitCode)->toBe(0)
@@ -153,8 +159,8 @@ it('allows missing generated types without writing fallback DTOs', function (): 
         ->and(is_file($basePath.'/resources/js/types/generated/index.d.ts'))->toBeFalse();
 });
 
-it('uses semantic ds utilities and no raw hex or primitive color utilities in stubs', function (): void {
-    $stubFiles = iakStubFiles();
+test('uses semantic ds utilities and no raw hex or primitive color utilities in stubs', function (): void {
+    $stubFiles = MakeResourceCommandTestHelper::stubFiles();
 
     expect($stubFiles)->not->toBeEmpty();
 
@@ -162,8 +168,8 @@ it('uses semantic ds utilities and no raw hex or primitive color utilities in st
         $contents = file_get_contents($stubFile) ?: '';
 
         expect($contents)
-            ->not->toMatch('/#[0-9a-fA-F]{3,8}\\b/')
-            ->not->toMatch('/\\b(?:bg|text|border)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)\\b/');
+            ->not->toMatch('/#[0-9a-fA-F]{3,8}\b/')
+            ->not->toMatch('/\b(?:bg|text|border)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)\b/');
 
     }
 
@@ -175,62 +181,68 @@ it('uses semantic ds utilities and no raw hex or primitive color utilities in st
     expect(implode("\n", $tsxStubContents))->toContain('ds-');
 });
 
-function iakFixtureBasePath(): string
-{
-    $basePath = sys_get_temp_dir().'/iak-make-resource-'.bin2hex(random_bytes(6));
+test('returns plain text summary when json flag is disabled', function (): void {
+    $basePath = $this->basePath;
+    MakeResourceCommandTestHelper::writeGeneratedTypes($basePath);
 
-    mkdir($basePath.'/resources/js', 0755, true);
+    $exitCode = Artisan::call('iak:make-resource', [
+        'resource' => 'vehicles',
+    ]);
 
-    app()->setBasePath($basePath);
+    expect($exitCode)->toBe(0)
+        ->and(Artisan::output())->toContain('Scaffolded vehicles resource.');
+});
 
-    return $basePath;
-}
+test('returns first error in plain text when scaffold fails', function (): void {
+    $exitCode = Artisan::call('iak:make-resource', [
+        '--adapter' => 'vue',
+    ]);
 
-function iakWriteGeneratedTypes(string $basePath): void
-{
-    $directory = $basePath.'/resources/js/types/generated';
+    expect($exitCode)->toBe(2)
+        ->and(Artisan::output())->toContain('Only the react adapter is supported in this package port.');
+});
 
-    if (! is_dir($directory)) {
-        mkdir($directory, 0755, true);
-    }
+test('normalizes resource argument for non-scalar values', function (): void {
+    $command = app(MakeResourceCommand::class);
+    $input = Mockery::mock(InputInterface::class);
 
-    file_put_contents($directory.'/index.d.ts', <<<'TS'
-export declare namespace App {
-  export namespace Data {
-    export namespace Vehicles {
-      export type VehicleIndexPageData = Record<string, unknown>
-      export type VehicleShowPageData = Record<string, unknown>
-      export type VehicleCreatePageData = Record<string, unknown>
-      export type VehicleEditPageData = Record<string, unknown>
-      export type VehicleListItemData = Record<string, unknown>
-      export type VehicleFormData = Record<string, unknown>
-      export type VehicleFiltersData = Record<string, unknown>
-    }
-  }
-}
-TS);
-}
+    $input->shouldReceive('getArgument')->with('resource')->andReturn(['vehicles']);
+    $input->shouldReceive('getOption')->withAnyArgs()->andReturnNull();
 
-function iakJsonOutput(): array
-{
-    return json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
-}
+    $inputProperty = new ReflectionProperty($command, 'input');
+    $inputProperty->setValue($command, $input);
 
-/**
- * @return array<int, string>
- */
-function iakStubFiles(): array
-{
-    $files = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__, 2).'/resources/stubs/react'));
+    $method = new ReflectionMethod($command, 'nullableArgument');
 
-    foreach ($iterator as $file) {
-        if ($file->isFile()) {
-            $files[] = $file->getPathname();
-        }
-    }
+    expect($method->invoke($command, 'resource'))->toBeNull();
+});
 
-    sort($files);
+test('normalizes option values for non-scalar values', function (): void {
+    $command = app(MakeResourceCommand::class);
+    $input = Mockery::mock(InputInterface::class);
 
-    return $files;
-}
+    $input->shouldReceive('getOption')->with('controller')->andReturn(['App\\\\Http\\\\Controllers\\\\VehicleController']);
+    $input->shouldReceive('getArgument')->withAnyArgs()->andReturnNull();
+
+    $inputProperty = new ReflectionProperty($command, 'input');
+    $inputProperty->setValue($command, $input);
+
+    $method = new ReflectionMethod($command, 'nullableOption');
+
+    expect($method->invoke($command, 'controller'))->toBeNull();
+});
+
+test('normalizes option values by trimming whitespace', function (): void {
+    $command = app(MakeResourceCommand::class);
+    $input = Mockery::mock(InputInterface::class);
+
+    $input->shouldReceive('getOption')->with('adapter')->andReturn('  react  ');
+    $input->shouldReceive('getArgument')->withAnyArgs()->andReturnNull();
+
+    $inputProperty = new ReflectionProperty($command, 'input');
+    $inputProperty->setValue($command, $input);
+
+    $method = new ReflectionMethod($command, 'nullableOption');
+
+    expect($method->invoke($command, 'adapter'))->toBe('react');
+});

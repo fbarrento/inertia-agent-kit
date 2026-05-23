@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Init;
 
+use Composer\InstalledVersions;
 use Illuminate\Contracts\Foundation\Application;
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\Files;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
 use RuntimeException;
 use Throwable;
 
-final class Initializer
+final readonly class Initializer
 {
     private const INIT_SCHEMA = 'iak.init.result.v1';
 
@@ -19,11 +21,11 @@ final class Initializer
 
     private const ADAPTER = 'react';
 
-    private readonly ProjectPaths $paths;
+    private ProjectPaths $paths;
 
-    private readonly Files $files;
+    private Files $files;
 
-    public function __construct(private readonly Application $app, ?ProjectPaths $paths = null, ?Files $files = null)
+    public function __construct(private Application $app, ?ProjectPaths $paths = null, ?Files $files = null)
     {
         $this->paths = $paths ?? new ProjectPaths($app);
         $this->files = $files ?? new Files($this->paths);
@@ -144,7 +146,7 @@ final class Initializer
     }
 
     /**
-     * @param list<array<string, mixed>> $reports
+     * @param  list<array<string, mixed>>  $reports
      */
     private function ensureDirectory(string $path, string $kind, bool $sourceControlled, array &$reports): void
     {
@@ -165,7 +167,7 @@ final class Initializer
     }
 
     /**
-     * @param list<array<string, mixed>> $reports
+     * @param  list<array<string, mixed>>  $reports
      */
     private function writeSource(string $path, string $contents, string $kind, array &$reports): void
     {
@@ -173,7 +175,7 @@ final class Initializer
     }
 
     /**
-     * @param list<array<string, mixed>> $reports
+     * @param  list<array<string, mixed>>  $reports
      */
     private function writeGenerated(string $path, string $contents, string $kind, bool $force, array &$reports): void
     {
@@ -181,7 +183,7 @@ final class Initializer
     }
 
     /**
-     * @param list<array<string, mixed>> $reports
+     * @param  list<array<string, mixed>>  $reports
      */
     private function writeFile(string $path, string $contents, string $kind, bool $sourceControlled, bool $generated, bool $force, array &$reports): void
     {
@@ -240,11 +242,7 @@ final class Initializer
     {
         $contents = file_get_contents(dirname(__DIR__, 2).'/config/inertia-agent-kit.php');
 
-        if ($contents === false) {
-            throw new RuntimeException('Unable to read package config stub.');
-        }
-
-        return $contents;
+        return $contents !== false ? $contents : throw new RuntimeException('Unable to read package config stub.');
     }
 
     /**
@@ -296,10 +294,9 @@ final class Initializer
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, mixed> $project
-     * @param array<string, mixed> $boost
-     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $boost
      * @return array<string, mixed>
      */
     private function runtimeConfig(array $config, array $project, array $boost): array
@@ -322,17 +319,16 @@ final class Initializer
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @param array<string, mixed> $project
-     * @param array<string, mixed> $boost
-     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $boost
      * @return array<string, mixed>
      */
     private function manifest(array $config, array $project, array $boost): array
     {
         return [
             'schema' => self::MANIFEST_SCHEMA,
-            'id' => 'manifest_'.substr(hash('sha256', $this->paths->basePath().'|'.$project['renderer']), 0, 16),
+            'id' => 'manifest_'.substr(hash('sha256', $this->paths->basePath().'|'.ArrayData::stringAt($project, ['renderer'], self::ADAPTER)), 0, 16),
             'status' => 'valid',
             'summary' => 'Laravel Inertia React project with IAK initialized.',
             'project' => [
@@ -344,14 +340,14 @@ final class Initializer
                 'typescript' => $project['typescript'],
             ],
             'adapter' => [
-                'id' => $this->adapterId((string) $project['renderer']),
+                'id' => $this->adapterId(ArrayData::stringAt($project, ['renderer'], self::ADAPTER)),
                 'version' => $project['iakVersion'],
             ],
             'conventions' => [
                 'pagesAreRouteAdapters' => true,
-                'featureRoot' => $config['paths']['features'],
-                'pageRoot' => $config['paths']['pages'],
-                'generatedTypes' => $config['paths']['typesGenerated'],
+                'featureRoot' => ArrayData::stringAt($config, ['paths', 'features'], 'resources/js/features'),
+                'pageRoot' => ArrayData::stringAt($config, ['paths', 'pages'], 'resources/js/pages'),
+                'generatedTypes' => ArrayData::stringAt($config, ['paths', 'typesGenerated'], 'resources/js/types/generated/index.d.ts'),
                 'backendOwnsFormatting' => true,
             ],
             'resources' => [],
@@ -370,8 +366,7 @@ final class Initializer
     }
 
     /**
-     * @param list<string> $required
-     *
+     * @param  list<string>  $required
      * @return array<string, mixed>
      */
     private function schema(string $schema, array $required): array
@@ -412,12 +407,12 @@ MARKDOWN;
         $composer = $this->readJson('composer.json');
         $package = $this->readJson('package.json');
         $dependencies = [
-            ...(is_array($composer['require'] ?? null) ? $composer['require'] : []),
-            ...(is_array($composer['require-dev'] ?? null) ? $composer['require-dev'] : []),
+            ...ArrayData::stringMap($composer['require'] ?? null),
+            ...ArrayData::stringMap($composer['require-dev'] ?? null),
         ];
         $nodeDependencies = [
-            ...(is_array($package['dependencies'] ?? null) ? $package['dependencies'] : []),
-            ...(is_array($package['devDependencies'] ?? null) ? $package['devDependencies'] : []),
+            ...ArrayData::stringMap($package['dependencies'] ?? null),
+            ...ArrayData::stringMap($package['devDependencies'] ?? null),
         ];
         $name = is_string($composer['name'] ?? null) ? basename((string) $composer['name']) : basename($this->paths->basePath());
 
@@ -434,8 +429,7 @@ MARKDOWN;
     }
 
     /**
-     * @param array<string, mixed> $project
-     *
+     * @param  array<string, mixed>  $project
      * @return array<string, mixed>
      */
     private function projectPayload(array $project): array
@@ -526,11 +520,10 @@ MARKDOWN;
     }
 
     /**
-     * @param array<string, mixed> $project
-     * @param array<string, mixed> $boost
-     * @param list<array<string, mixed>> $files
-     * @param list<array<string, mixed>> $errors
-     *
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $boost
+     * @param  list<array<string, mixed>>  $files
+     * @param  list<array<string, mixed>>  $errors
      * @return array{exitCode: int, payload: array<string, mixed>}
      */
     private function failed(string $runId, string $createdAt, string $adapter, array $project, array $boost, array $files, array $errors, int $exitCode): array
@@ -583,7 +576,7 @@ MARKDOWN;
     {
         $value = function_exists('config') ? config("inertia-agent-kit.{$key}", $default) : $default;
 
-        return is_string($value) && $value !== '' ? $value : $default;
+        return $value !== '' ? $value : $default;
     }
 
     private function adapterId(string $adapter): string
@@ -592,7 +585,7 @@ MARKDOWN;
     }
 
     /**
-     * @param array<string, mixed> $composer
+     * @param  array<string, mixed>  $composer
      */
     private function packageVersion(array $composer): string
     {
@@ -603,16 +596,16 @@ MARKDOWN;
 
     private function installedVersion(string $package): ?string
     {
-        if (! class_exists('Composer\\InstalledVersions') || ! \Composer\InstalledVersions::isInstalled($package)) {
+        if (! class_exists(InstalledVersions::class) || ! InstalledVersions::isInstalled($package)) {
             return null;
         }
 
-        return \Composer\InstalledVersions::getPrettyVersion($package);
+        return InstalledVersions::getPrettyVersion($package);
     }
 
     /**
-     * @param array<string, mixed> $dependencies
-     * @param array<string, mixed> $nodeDependencies
+     * @param  array<string, mixed>  $dependencies
+     * @param  array<string, mixed>  $nodeDependencies
      */
     private function detectInertiaVersion(array $dependencies, array $nodeDependencies): string
     {
@@ -628,7 +621,7 @@ MARKDOWN;
     }
 
     /**
-     * @param array<string, mixed> $dependencies
+     * @param  array<string, mixed>  $dependencies
      */
     private function detectBoost(array $dependencies): bool
     {
@@ -659,11 +652,11 @@ MARKDOWN;
             return [];
         }
 
-        return is_array($decoded) ? $decoded : [];
+        return ArrayData::stringMap($decoded);
     }
 
     /**
-     * @param array<string, mixed> $value
+     * @param  array<string, mixed>  $value
      *
      * @throws JsonException
      */

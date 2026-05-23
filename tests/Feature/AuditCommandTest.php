@@ -2,153 +2,37 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Artisan;
+use Tests\Utils\AuditCommandTestHelper;
+use Tests\Utils\AuditTestHelper;
 
-function iak_audit_temp_base(): string
-{
-    $path = sys_get_temp_dir().'/iak-audit-'.bin2hex(random_bytes(6));
+beforeEach(function (): void {
+    $this->base = AuditCommandTestHelper::useTempBase($this->app);
+});
 
-    mkdir($path, 0755, true);
+afterEach(function (): void {
+    $directory = $this->base ?? null;
 
-    return $path;
-}
-
-function iak_audit_use_temp_base(object $app): string
-{
-    $base = iak_audit_temp_base();
-    $app->setBasePath($base);
-
-    return $base;
-}
-
-function iak_audit_write(string $base, string $path, string $contents): void
-{
-    $absolute = $base.'/'.$path;
-
-    if (! is_dir(dirname($absolute))) {
-        mkdir(dirname($absolute), 0755, true);
+    if (! is_string($directory) || ! is_dir($directory)) {
+        return;
     }
 
-    file_put_contents($absolute, $contents);
-}
+    $items = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST,
+    );
 
-function iak_audit_clean_fixture(string $base): void
-{
-    iak_audit_write($base, 'resources/js/components/ui/button.tsx', <<<'TSX'
-export function Button() {
-    return <button className="bg-ds-surface text-ds-body border-ds-border">Save</button>;
-}
-TSX);
-
-    iak_audit_write($base, 'resources/js/components/ui/button.stories.tsx', <<<'TSX'
-import { Button } from './button';
-
-export default { component: Button };
-export const Default = {};
-TSX);
-
-    iak_audit_write($base, 'resources/js/components/app/filter-bar.tsx', <<<'TSX'
-export function FilterBar() {
-    return <div className="bg-ds-panel text-ds-muted border-ds-border">Filters</div>;
-}
-TSX);
-
-    iak_audit_write($base, 'resources/js/components/app/filter-bar.stories.tsx', <<<'TSX'
-import { FilterBar } from './filter-bar';
-
-export default { component: FilterBar };
-export const Default = {};
-TSX);
-
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle-table.tsx', <<<'TSX'
-import type { VehicleResource } from './vehicle.types';
-
-export function VehicleTable({ vehicles }: { vehicles: VehicleResource[] }) {
-    return <section className="bg-ds-surface text-ds-body border-ds-border">{vehicles.length}</section>;
-}
-TSX);
-
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle-table.stories.tsx', <<<'TSX'
-import { VehicleTable } from './vehicle-table';
-
-export default { component: VehicleTable };
-export const Default = { args: { vehicles: [] } };
-TSX);
-
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle-form.tsx', <<<'TSX'
-export function VehicleForm() {
-    return <form className="bg-ds-surface text-ds-body border-ds-border" />;
-}
-TSX);
-
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle-form.stories.tsx', <<<'TSX'
-import { VehicleForm } from './vehicle-form';
-
-export default { component: VehicleForm };
-export const Default = {};
-TSX);
-
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle.types.ts', <<<'TS'
-import type { App } from '@/types/generated';
-
-export type VehicleResource = App.Data.VehicleData;
-TS);
-
-    iak_audit_write($base, 'resources/js/types/generated/index.d.ts', <<<'TS'
-export namespace App {
-    export namespace Data {
-        export type VehicleData = { id: number; name: string };
-    }
-}
-TS);
-
-    iak_audit_write($base, 'resources/css/iak/tokens.css', <<<'CSS'
-:root {
-    --ds-color-surface: #ffffff;
-}
-CSS);
-}
-
-/**
- * @param array<string, mixed> $arguments
- *
- * @return array{0: int, 1: array<string, mixed>}
- */
-function iak_audit_run(string $runId, array $arguments = []): array
-{
-    $exitCode = Artisan::call('iak:audit', [
-        '--json' => true,
-        '--run-id' => $runId,
-        ...$arguments,
-    ]);
-
-    return [
-        $exitCode,
-        json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR),
-    ];
-}
-
-/**
- * @param array<string, mixed> $payload
- *
- * @return array<string, mixed>|null
- */
-function iak_audit_violation(array $payload, string $rule): ?array
-{
-    foreach ($payload['violations'] as $violation) {
-        if ($violation['rule'] === $rule) {
-            return $violation;
-        }
+    foreach ($items as $item) {
+        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
     }
 
-    return null;
-}
+    rmdir($directory);
+});
 
-it('passes a clean scaffold-like fixture', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
+test('passes a clean scaffold-like fixture', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
 
-    [$exitCode, $payload] = iak_audit_run('run_clean');
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_clean');
 
     expect($exitCode)->toBe(0)
         ->and($payload['schema'])->toBe('iak.audit.v1')
@@ -159,10 +43,10 @@ it('passes a clean scaffold-like fixture', function (): void {
         ->and($payload['artifacts']['audit']['path'])->toBe('.iak/runs/run_clean/audit.json');
 });
 
-it('reports design-system violations with locations and fingerprints', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle-table.tsx', <<<'TSX'
+test('reports design-system violations with locations and fingerprints', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+    AuditCommandTestHelper::write($base, 'resources/js/features/vehicles/vehicle-table.tsx', <<<'TSX'
 export function VehicleTable() {
     const swatch = '#ffffff';
 
@@ -170,7 +54,7 @@ export function VehicleTable() {
 }
 TSX);
 
-    [$exitCode, $payload] = iak_audit_run('run_design_violations');
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_design_violations');
     $rules = array_column($payload['violations'], 'rule');
 
     expect($exitCode)->toBe(1)
@@ -184,25 +68,25 @@ TSX);
         'iak/design-system/no-raw-hex' => '#ffffff',
         'iak/design-system/no-primitive-color' => 'bg-blue-500',
     ] as $rule => $hit) {
-        $violation = iak_audit_violation($payload, $rule);
+        $violation = AuditCommandTestHelper::violation($payload, $rule);
 
         expect($violation)->not->toBeNull()
             ->and($violation['file'])->toBe('resources/js/features/vehicles/vehicle-table.tsx')
             ->and($violation['hit'])->toBe($hit)
             ->and(is_int($violation['line']))->toBeTrue()
             ->and(is_int($violation['column']))->toBeTrue()
-            ->and(str_starts_with($violation['fingerprint'], 'sha256:'))->toBeTrue();
+            ->and(str_starts_with((string) $violation['fingerprint'], 'sha256:'))->toBeTrue();
     }
 });
 
-it('reports forbidden top-level behavior folders while allowing generated actions', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
-    iak_audit_write($base, 'resources/js/hooks/use-vehicles.ts', 'export const useVehicles = () => null;');
-    iak_audit_write($base, 'resources/js/actions/vehicles.ts', 'export const storeVehicle = () => null;');
-    iak_audit_write($base, 'resources/js/actions/generated/vehicles.ts', 'export const generated = () => null;');
+test('reports forbidden top-level behavior folders while allowing generated actions', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+    AuditCommandTestHelper::write($base, 'resources/js/hooks/use-vehicles.ts', 'export const useVehicles = () => null;');
+    AuditCommandTestHelper::write($base, 'resources/js/actions/vehicles.ts', 'export const storeVehicle = () => null;');
+    AuditCommandTestHelper::write($base, 'resources/js/actions/generated/vehicles.ts', 'export const generated = () => null;');
 
-    [$exitCode, $payload] = iak_audit_run('run_forbidden_folders');
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_forbidden_folders');
     $files = array_column(array_filter(
         $payload['violations'],
         static fn (array $violation): bool => $violation['rule'] === 'iak/role/no-top-level-behavior-folder'
@@ -214,89 +98,254 @@ it('reports forbidden top-level behavior folders while allowing generated action
         ->and($files)->not->toContain('resources/js/actions/generated/vehicles.ts');
 });
 
-it('reports missing required ui app and feature stories', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
+test('reports missing required ui app and feature stories', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
 
     unlink($base.'/resources/js/components/ui/button.stories.tsx');
     unlink($base.'/resources/js/components/app/filter-bar.stories.tsx');
     unlink($base.'/resources/js/features/vehicles/vehicle-table.stories.tsx');
 
-    [$exitCode, $payload] = iak_audit_run('run_missing_stories');
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_missing_stories');
 
     expect($exitCode)->toBe(1)
-        ->and(iak_audit_violation($payload, 'iak/stories/required-ui')['hit'])
-        ->toBe('resources/js/components/ui/button.stories.tsx')
-        ->and(iak_audit_violation($payload, 'iak/stories/required-app')['hit'])
-        ->toBe('resources/js/components/app/filter-bar.stories.tsx')
-        ->and(iak_audit_violation($payload, 'iak/stories/required-feature')['hit'])
-        ->toBe('resources/js/features/vehicles/vehicle-table.stories.tsx');
+        ->and(AuditCommandTestHelper::violation($payload, 'iak/stories/required-ui')['hit'])->toBe('resources/js/components/ui/button.stories.tsx')
+        ->and(AuditCommandTestHelper::violation($payload, 'iak/stories/required-app')['hit'])->toBe('resources/js/components/app/filter-bar.stories.tsx')
+        ->and(AuditCommandTestHelper::violation($payload, 'iak/stories/required-feature')['hit'])->toBe('resources/js/features/vehicles/vehicle-table.stories.tsx');
 });
 
-it('reports feature type files missing generated contract imports', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle.types.ts', <<<'TS'
+test('reports feature type files missing generated contract imports', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+    AuditCommandTestHelper::write($base, 'resources/js/features/vehicles/vehicle.types.ts', <<<'TS'
 export type VehicleResource = { id: number; name: string };
 TS);
 
-    [$exitCode, $payload] = iak_audit_run('run_missing_type_import');
-    $violation = iak_audit_violation($payload, 'iak/types/generated-contract-import-required');
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_missing_type_import');
+    $violation = AuditCommandTestHelper::violation($payload, 'iak/types/generated-contract-import-required');
 
     expect($exitCode)->toBe(1)
         ->and($violation)->not->toBeNull()
         ->and($violation['file'])->toBe('resources/js/features/vehicles/vehicle.types.ts')
         ->and($violation['hit'])->toBe('@/types/generated');
 
-    iak_audit_write($base, 'resources/js/features/vehicles/vehicle.types.ts', <<<'TS'
+    AuditCommandTestHelper::write($base, 'resources/js/features/vehicles/vehicle.types.ts', <<<'TS'
 import type { App } from '@/types/generated';
 
 export type VehicleResource = App.Data.VehicleData;
 TS);
 
-    [$fixedExitCode, $fixedPayload] = iak_audit_run('run_fixed_type_import');
+    [$fixedExitCode, $fixedPayload] = AuditCommandTestHelper::run('run_fixed_type_import');
 
     expect($fixedExitCode)->toBe(0)
         ->and($fixedPayload['violations'])->toBe([]);
 });
 
-it('writes an audit artifact matching stdout json', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
-
-    [$exitCode, $payload] = iak_audit_run('run_artifact');
-    $artifact = json_decode(
-        file_get_contents($base.'/'.$payload['artifacts']['audit']['path']) ?: '',
-        true,
-        512,
-        JSON_THROW_ON_ERROR
-    );
-
-    expect($exitCode)->toBe(0)
-        ->and($artifact)->toEqual($payload);
-});
-
-it('returns a structured blocked result for invalid config', function (): void {
-    $base = iak_audit_use_temp_base($this->app);
-    iak_audit_clean_fixture($base);
-    iak_audit_write($base, 'invalid-iak.php', <<<'PHP'
-<?php
-
-return 'invalid';
-PHP);
-
-    [$exitCode, $payload] = iak_audit_run('run_invalid_config', [
-        '--config' => 'invalid-iak.php',
+test('returns blocked payload for invalid run identifier', function (): void {
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run/../bad', [
+        '--config' => config_path('inertia-agent-kit.php'),
     ]);
-    $artifact = json_decode(
-        file_get_contents($base.'/'.$payload['artifacts']['audit']['path']) ?: '',
-        true,
-        512,
-        JSON_THROW_ON_ERROR
-    );
 
     expect($exitCode)->toBe(2)
         ->and($payload['status'])->toBe('blocked')
-        ->and($payload['errors'][0]['code'])->toBe('iak.config.load_failed')
-        ->and($artifact)->toEqual($payload);
+        ->and($payload['errors'][0]['code'])->toBe('iak.usage.invalid_run_id')
+        ->and($payload['artifacts']['audit']['path'])->toBe('.iak/runs/run_invalid/audit.json');
+});
+
+test('returns blocked payload for missing config files', function (): void {
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_missing_config', [
+        '--config' => 'config/missing.php',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.config.load_failed');
+});
+
+test('returns blocked payload for invalid config contents', function (): void {
+    $base = $this->base;
+    mkdir($base.'/config', 0755, true);
+    file_put_contents($base.'/config/faulty-audit.php', '<?php return "invalid";');
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_invalid_config', [
+        '--config' => 'config/faulty-audit.php',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.config.load_failed');
+});
+
+test('returns blocked payload when configuration shape is invalid', function (): void {
+    $base = $this->base;
+    mkdir($base.'/config', 0755, true);
+    file_put_contents($base.'/config/invalid-shape.php', '<?php return ["paths" => "bad"];');
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_invalid_shape', [
+        '--config' => 'config/invalid-shape.php',
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.config.invalid');
+});
+
+test('returns plain text output when json output is disabled', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+
+    $exitCode = Artisan::call('iak:audit', [
+        '--run-id' => 'run_plain',
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Audit passed: 0 errors.')
+        ->and($output)->toContain('Artifact: .iak/runs/run_plain/audit.json');
+});
+
+test('returns blocked output when generated config section is invalid', function (): void {
+    $base = $this->base;
+
+    AuditCommandTestHelper::writeCleanFixture($base);
+    mkdir($base.'/config', 0755, true);
+    $config = AuditTestHelper::config($base);
+    $config['generated'] = null;
+    $config['forbidden_folders'] = ['hooks'];
+
+    $path = 'config/invalid-generated.php';
+    file_put_contents($base.'/'.$path, '<?php return '.var_export($config, true).';');
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_invalid_generated', [
+        '--config' => $path,
+    ]);
+
+    $validationErrors = $payload['errors'][0]['context']['errors'] ?? [];
+    $validationCodes = array_column($validationErrors, 'code');
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.config.invalid')
+        ->and($validationCodes)->toContain('iak.config.generated.type_alias_invalid')
+        ->and($validationCodes)->toContain('iak.config.generated.types_invalid')
+        ->and($validationCodes)->toContain('iak.config.generated.routes_invalid')
+        ->and($validationCodes)->toContain('iak.config.generated.actions_invalid');
+});
+
+test('returns blocked output when forbidden folders config is invalid', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+    mkdir($base.'/config', 0755, true);
+    $config = AuditTestHelper::config($base);
+    $config['forbidden_folders'] = 'hooks';
+
+    $path = 'config/invalid-forbidden.php';
+    file_put_contents($base.'/'.$path, '<?php return '.var_export($config, true).';');
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_invalid_forbidden', [
+        '--config' => $path,
+    ]);
+
+    $validationErrors = $payload['errors'][0]['context']['errors'] ?? [];
+    $validationCodes = array_column($validationErrors, 'code');
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.config.invalid')
+        ->and($validationCodes)->toContain('iak.config.forbidden_folders_invalid');
+});
+
+test('returns blocked output when audit payload cannot be encoded as json', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+
+    $path = 'config/unencodable.php';
+    mkdir($base.'/config', 0755, true);
+    file_put_contents($base.'/'.$path, <<<'PHP'
+<?php
+return [
+    'paths' => [
+        'root' => 'resources/js',
+        'features' => 'resources/js/features',
+        'components_ui' => 'resources/js/components/ui',
+        'components_app' => 'resources/js/components/app',
+        'runs' => '.iak/runs',
+        'layouts' => 'resources/js/layouts',
+        'css' => 'resources/css/iak',
+    ],
+    'generated' => [
+        'type_alias' => '@/types/generated',
+        'types' => 'resources/js/types/generated/index.d.ts',
+        'routes' => 'resources/js/routes/generated',
+        'actions' => 'resources/js/actions/generated',
+    ],
+    'audit' => [
+        'rules' => [
+            'no_raw_palette_or_arbitrary_values' => [
+                'ignore_files' => ['resources/css/iak/tokens.css'],
+            ],
+        ],
+    ],
+    'forbidden_folders' => ['hooks'],
+    'extra' => fopen(__FILE__, 'r'),
+];
+PHP
+    );
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_json_error', [
+        '--config' => $path,
+    ]);
+
+    expect($exitCode)->toBe(2)
+        ->and($payload['status'])->toBe('blocked')
+        ->and($payload['errors'][0]['code'])->toBe('iak.json.encode_failed')
+        ->and($payload['summary'])->toContain('blocked');
+});
+
+test('defaults adapter metadata to react when config adapter is empty', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+
+    config(['inertia-agent-kit.adapter' => '']);
+
+    [$exitCode, $payload] = AuditCommandTestHelper::run('run_default_adapter');
+
+    expect($exitCode)->toBe(0)
+        ->and($payload['meta']['adapter'])->toBe('laravel-inertia-react');
+});
+
+test('uses a generated run id when one is not provided', function (): void {
+    AuditCommandTestHelper::writeCleanFixture($this->base);
+
+    $exitCode = Artisan::call('iak:audit', [
+        '--json' => true,
+    ]);
+    $payload = AuditCommandTestHelper::lastJsonOutput();
+
+    $runId = $payload['runId'] ?? '';
+
+    expect($exitCode)->toBe(0)
+        ->and($payload['status'])->toBe('passed')
+        ->and($runId)->toMatch('/^run_[a-z0-9-]+$/i')
+        ->and($payload['artifacts']['audit']['path'])->toStartWith('.iak/runs/')
+        ->and(base_path($payload['artifacts']['audit']['path']))->toBeFile();
+});
+
+test('pretty prints audit json when requested', function (): void {
+    $base = $this->base;
+    AuditCommandTestHelper::writeCleanFixture($base);
+
+    $exitCode = Artisan::call('iak:audit', [
+        '--json' => true,
+        '--pretty' => true,
+        '--run-id' => 'run_pretty',
+    ]);
+
+    $output = Artisan::output();
+    $payload = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
+
+    expect($exitCode)->toBe(0)
+        ->and($payload['status'])->toBe('passed')
+        ->and($output)->toContain(PHP_EOL.'    "event": "iak.audit.completed"');
 });

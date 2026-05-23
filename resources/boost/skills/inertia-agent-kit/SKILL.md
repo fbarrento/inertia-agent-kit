@@ -1,34 +1,41 @@
 ---
 name: inertia-agent-kit
-description: Use when implementing, debugging, auditing, verifying, or handing off Laravel Inertia UI work with IAK manifest, scaffolding, feedback, audit, verify, design-system, or Storybook evidence.
+description: Use when changing, auditing, verifying, or handing off Laravel Inertia UI work with IAK manifest, scaffolding, feedback, design-system, or Storybook evidence.
 ---
 
 # Inertia Agent Kit
 
-Use this skill for non-trivial Laravel/Inertia frontend work: implementing or
-refactoring a user flow, tracing page props and form behavior, reviewing
-`iak:make-resource` output, resolving `iak.feedback.v1` records, fixing
-`iak:audit` or `iak:verify` failures, changing reusable components, or preparing
-handoff evidence.
+Use this skill for non-trivial Laravel/Inertia frontend work: user-flow
+refactors, page prop tracing, `iak:make-resource` review,
+`iak.feedback.v1` resolution, `iak:audit` or `iak:verify` failures, reusable
+component changes, and handoff evidence.
 
 ## Product Boundary
 
-Boost stays first for generic Laravel facts. Use Boost tools and documentation
-for framework versions, installed packages, Laravel/Inertia/Tailwind/Pest
-reference, route facts, app URLs, logs, browser logs, last errors, database
-connections, schema, safe read queries, baseline MCP setup, and Boost resource
-discovery.
+Boost stays first for generic Laravel facts: versions, docs,
+route facts, app URLs, logs, browser logs, last errors, database/schema, safe
+reads, MCP setup, and resource discovery.
 
 IAK starts after that context is known. Use IAK for Inertia/frontend
 conventions, manifest context, page and resource roles, `iak:make-resource`
-scaffolding, generated backend-derived TypeScript discipline, audit, feedback,
+scaffolding, generated TypeScript discipline, audit, feedback,
 verify, design-system contracts, Storybook/HITL evidence, and final JSON
 handoff evidence.
 
 Do not manually edit Boost-generated files such as `CLAUDE.md`, `AGENTS.md`,
 `.mcp.json`, `boost.json`, or generated Boost guidelines/skills. Use
-`boost:install` or `boost:update --discover` when the app needs Boost-managed
+`boost:install` or `boost:update --discover` when apps need Boost-managed
 resources refreshed.
+
+## Package Refactor Rules
+
+For IAK itself, target Laravel 12/13. Flat roles:
+`src/Actions/*` is one-responsibility `handle()` with constructor injection and
+no private helpers; `src/Data/*` implements `JsonSerializable`; `src/Enum/*`
+owns fixed vocabularies, no private string const lists; `src/Console/*` is
+input/output; `src/Support/*` is small reusable helpers/adapters. Mirror every production class under
+`tests/Unit`, avoid global Pest helpers, keep 100.0% coverage, and gate with
+PHPStan at max level plus Rector dry-run.
 
 ## Required Workflow
 

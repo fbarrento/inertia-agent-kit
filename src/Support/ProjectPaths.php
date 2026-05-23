@@ -6,12 +6,11 @@ namespace InertiaAgentKit\Support;
 
 use Illuminate\Contracts\Foundation\Application;
 
-final class ProjectPaths
+final readonly class ProjectPaths
 {
     public function __construct(
-        private readonly ?Application $app = null
-    ) {
-    }
+        private ?Application $app = null
+    ) {}
 
     public function basePath(?string $path = null): string
     {
@@ -82,6 +81,7 @@ final class ProjectPaths
             if ($segment === '..') {
                 if ($segments !== [] && end($segments) !== '..') {
                     array_pop($segments);
+
                     continue;
                 }
 

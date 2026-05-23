@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace InertiaAgentKit\Feedback;
 
+use InertiaAgentKit\Support\ArrayData;
 use InertiaAgentKit\Support\ProjectPaths;
 use JsonException;
 use RuntimeException;
 
-final class FeedbackStore
+final readonly class FeedbackStore
 {
     /** @var array<int, string> */
     public const STATUSES = [
@@ -20,10 +21,9 @@ final class FeedbackStore
     ];
 
     public function __construct(
-        private readonly ProjectPaths $paths,
-        private readonly string $feedbackPath = '.iak/feedback',
-    ) {
-    }
+        private ProjectPaths $paths,
+        private string $feedbackPath = '.iak/feedback',
+    ) {}
 
     public function feedbackPath(): string
     {
@@ -82,7 +82,7 @@ final class FeedbackStore
     }
 
     /**
-     * @param array<string, mixed> $record
+     * @param  array<string, mixed>  $record
      */
     public function writeRecord(string $id, array $record): string
     {
@@ -90,7 +90,7 @@ final class FeedbackStore
     }
 
     /**
-     * @param array<string, mixed> $evidence
+     * @param  array<string, mixed>  $evidence
      */
     public function writeResolutionEvidence(string $id, array $evidence): string
     {
@@ -140,11 +140,11 @@ final class FeedbackStore
             );
         }
 
-        return $decoded;
+        return ArrayData::stringMap($decoded);
     }
 
     /**
-     * @param array<string, mixed> $value
+     * @param  array<string, mixed>  $value
      */
     private function writeJsonAtomic(string $relativePath, array $value): string
     {

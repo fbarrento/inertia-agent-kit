@@ -8,8 +8,20 @@ on:
 
 jobs:
   php-package:
-    name: PHP Package
+    name: PHP Package (Laravel ${{ matrix.laravel }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - laravel: '12'
+            laravel-framework: '^12.0'
+            php: '8.3'
+            testbench: '^10.0'
+          - laravel: '13'
+            laravel-framework: '^13.0'
+            php: '8.3'
+            testbench: '^11.0'
 
     steps:
       - name: Checkout
@@ -18,17 +30,20 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: ${{ matrix.php }}
           coverage: none
 
       - name: Validate Composer metadata
         run: composer validate --strict
 
       - name: Install Composer dependencies
-        run: composer update --prefer-dist --no-interaction --no-progress
+        run: composer update --with "laravel/framework:${{ matrix.laravel-framework }}" --with "orchestra/testbench:${{ matrix.testbench }}" --prefer-dist --no-interaction --no-progress
 
       - name: Lint PHP files
         run: find config src tests resources -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+
+      - name: Run static analysis
+        run: composer lint:check
 
       - name: Run Pest suite
         run: composer test

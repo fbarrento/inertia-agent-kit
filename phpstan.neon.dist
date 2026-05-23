@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: max
+    paths:
+        - config
+        - src
+    bootstrapFiles:
+        - vendor/autoload.php
+    tmpDir: .phpstan-cache
+    checkConfigTypes: true
+    noEnvCallsOutsideOfConfig: false

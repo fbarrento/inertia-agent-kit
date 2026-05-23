@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "laravel-rules": {
+      "source": "fbarrento/laravel-agent-kit",
+      "sourceType": "github",
+      "skillPath": "skills/laravel-rules/SKILL.md",
+      "computedHash": "5a72e27266b186776286ed7b7f29e91d6427c0c503be542f040f95370fdf943d"
+    },
+    "new-task": {
+      "source": "fbarrento/laravel-agent-kit",
+      "sourceType": "github",
+      "skillPath": "skills/new-task/SKILL.md",
+      "computedHash": "c04e8249cd5aea17ea7b012ce75738b44ca0bb9605335b0e5ed33eca26c05dcc"
+    },
+    "pest-package-tests": {
+      "source": "fbarrento/laravel-agent-kit",
+      "sourceType": "github",
+      "skillPath": "skills/pest-package-tests/SKILL.md",
+      "computedHash": "1a62a02b36ecbe2833b4b6979fa4022fbce6baca72af9f0dbb93c2313558c5e2"
+    }
+  }
+}
